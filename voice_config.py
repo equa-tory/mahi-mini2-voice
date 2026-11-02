@@ -34,7 +34,7 @@ def validate_voice(config):
     if not 0<=float(config.get("tts_volume",.65))<=1:raise ValueError("speech volume must be 0..1")
     if config.get("tts_speaker","baya") not in ("aidar","baya","kseniya","xenia","eugene"):raise ValueError("unknown voice")
     if not 1<=int(config.get("wake_confirmations",2))<=5:raise ValueError("wake confirmations must be1..5")
-    if config.get("whisper_model","base") not in ("base","small","small-cpp"):raise ValueError("recognition model must be base, small or small-cpp")
+    if config.get("whisper_model","base") not in ("base","small","small-cpp","turbo-cpp","off"):raise ValueError("recognition model must be base, small, small-cpp, turbo-cpp or off")
     if not .25<=float(config.get("microphone_gain",4))<=16:raise ValueError("microphone gain must be0.25..16")
     if not 10<=int(config.get("speech_threshold",80))<=3000:raise ValueError("speech threshold must be10..3000")
     if not .3<=float(config.get("silence_seconds",.65))<=2:raise ValueError("silence duration must be0.3..2seconds")

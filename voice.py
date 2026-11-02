@@ -132,7 +132,7 @@ def guard(control=None):
                 if control.interrupt_callback:control.interrupt_callback()
             stop_stream()
             clear_audio()
-            status(phase="standby" if LEASE and LEASE.healthy and not LEASE.owned else "muted_or_disconnected",listening_enabled=False)
+            status(phase="models_unloaded" if LEASE and LEASE.asr_model=="off" else "standby" if LEASE and LEASE.healthy and not LEASE.owned else "muted_or_disconnected",listening_enabled=False)
         STOP.wait(.5)
 
 CAPTURE_COMMAND = """set -eu
@@ -257,10 +257,13 @@ class Engine:
                 raise RuntimeError("wake word is absent from recognizer vocabulary")
         self.rec=KaldiRecognizer(self.model,16000,json.dumps([self.wake,"[unk]"],ensure_ascii=False))
         status(phase="loading_transcription")
+        if config.get("whisper_model")=="off":
+            from voice_asr import unload_asr
+            unload_asr()
         self.asr=load_asr(config.get("whisper_model","base"))
         self.speech=Speech(config,tts_path)
         self.matches=0
-        self.preroll=collections.deque(maxlen=10)
+        self.preroll=collections.deque(maxlen=30)
         self.noise=20.0
         self.levels=collections.deque(maxlen=50)
 
@@ -391,6 +394,11 @@ class Engine:
             if fresh.get("whisper_model","base")!=self.config.get("whisper_model","base"):
                 from voice_asr import load_asr
                 status(phase="loading_transcription")
+                from voice_asr import unload_asr
+                import gc
+                if fresh.get("whisper_model") in ("off","base","small"):unload_asr()
+                self.asr=None
+                gc.collect()
                 self.asr=load_asr(fresh.get("whisper_model","base"))
                 clear_audio();self.rec.Reset();status(phase="idle")
             word=fresh["wake_word"].lower()
@@ -432,6 +440,8 @@ class Engine:
             raw_text=" ".join(segment.text for segment in segments)
             text=strip_wake(raw_text,self.wake)
             result=classify(text,*voice_routes(self.config))
+            from voice_asr import hallucinated_transcript
+            if hallucinated_transcript(raw_text):result=("ignored",None)
             if not testing:
                 self.command_text=text
                 attempts=list(STATE.get("history", [{}])[0].get("attempts", []))
@@ -465,6 +475,9 @@ class Engine:
         # The bounded dashboard history is explicitly enabled for recognition diagnosis.
         status(last_intent=intent,command_count=STATE["command_count"]+1)
         if self.control.active() or self.control.cancelled.is_set():return
+        if intent=="ignored":
+            voice_event(outcome="ignored_hallucination",response="")
+            return
         if intent=="empty":
             self.say(self.response("empty"))
             clear_audio();status(phase="listening");indicate("listening")
@@ -548,6 +561,9 @@ class Engine:
         while not STOP.is_set():
             self.reload_config()
             self.preview_voice()
+            if self.asr is None:
+                STOP.wait(.3)
+                continue
             self.compare_recording()
             testing=self.control.active()
             if testing!=getattr(self,"was_testing",False):

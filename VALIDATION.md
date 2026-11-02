@@ -52,3 +52,19 @@ Recent voice diagnostics and cancellation update: 58 Python tests pass (two opti
   fallback (8.82 s); restoring the endpoint used Turbo GPU again (0.50 s).
 - CPU-only profiles remain available. GPU/CPU backend is recorded in request
   history and displayed in voice status. No model is reloaded per request.
+
+## Selectable GPU models, unload and hallucination diagnosis
+
+- 64 Python tests pass (two optional host NumPy skips). Covers Small/Turbo model
+  mapping, missing model rejection, paused lease ownership, valid unload request
+  encoding, and known subtitle hallucinations versus normal Russian commands.
+- Live dashboard config switches successfully loaded GPU Small and Turbo.
+- Unload freed model weights: GPU process memory fell to 118 MiB (CUDA context),
+  listening became false, phase became models_unloaded, and voice lease released.
+- Replaying the same recent timer clip with full context recovered its timer
+  words; reduced context had produced unrelated words. Full context measured
+  about 0.86–0.96 s per short clip. Beam width 5 and higher normalization gain
+  offered no consistent improvement, so neither was adopted.
+- Pre-wake buffer extended from one to three seconds to preserve fast commands.
+  Quiet subtitle hallucination recordings still cannot be recovered reliably;
+  raw text/audio remain visible and the result is explicitly ignored.

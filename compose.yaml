@@ -34,7 +34,7 @@ services:
     environment:
       AUTOMATION_URL: http://127.0.0.1:8787
       WHISPER_CPP_URL: http://127.0.0.1:8788/inference
-      WHISPER_CPP_AUDIO_CONTEXT: '512'
+      WHISPER_CPP_AUDIO_CONTEXT: '0'
       VOICE_ASR_BACKEND: ${WHISPER_BACKEND_NAME:-whisper-cpp-small-q5_1}
       OMP_NUM_THREADS: '4'
       HF_HUB_OFFLINE: '1'

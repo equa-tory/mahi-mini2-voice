@@ -17,20 +17,25 @@ class VoiceLease:
 
     def configure_model(self, model):
         self.asr_model=model
-        self.backend=os.environ.get('VOICE_ASR_BACKEND','whisper-cpp') if model=='small-cpp' else 'faster-whisper-'+model+'-cpu'
+        from voice_asr import GPU_MODELS, model_backend
+        self.backend=model_backend(GPU_MODELS[model]) if model in GPU_MODELS else "unloaded" if model=="off" else "faster-whisper-"+model+"-cpu"
 
     def check_health(self):
         opener=urllib.request.build_opener(urllib.request.ProxyHandler({}))
         urls=[os.environ.get('AUTOMATION_URL','http://127.0.0.1:8787')+'/health']
         # A resident CPU fallback keeps recognition available if the GPU fails.
         from voice_asr import cpu_fallback_enabled
-        if self.asr_model=="small-cpp" and not cpu_fallback_enabled():
+        if self.asr_model in ("small-cpp","turbo-cpp") and not cpu_fallback_enabled():
             urls.append(os.environ.get("WHISPER_CPP_URL","http://127.0.0.1:8788/inference").rsplit("/",1)[0]+"/health")
         for url in urls:
             with opener.open(url,timeout=1) as response:
                 if response.status!=200: raise RuntimeError('voice backend unavailable')
 
     def renew(self):
+        if self.asr_model=="off":
+            if self.owned:self.release()
+            self.healthy=False
+            return False
         if not self.url: raise RuntimeError('VOICE_PUBLIC_URL must identify this node')
         try:
             self.health()

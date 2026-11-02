@@ -211,3 +211,20 @@ The built-in CPU fallback defaults on for amd64; ARM64 retains the external
 Whisper.cpp CPU service without requiring faster-whisper. Set
 `VOICE_CPU_FALLBACK=0` in the private environment to disable the additional
 resident fallback model.
+
+### Select or unload recognition models
+
+Voice & phrases now lists GPU Small, GPU Large-v3 Turbo, CPU Base and CPU Small
+separately. Save voice settings to switch; the local Whisper server loads the
+selected GPU model once and keeps it resident. Install the Turbo model file
+before selecting it. The startup environment model setting is superseded by the
+dashboard profile when the worker starts.
+
+**Unload recognition models** releases the GPU model and the worker's CPU ASR
+model, pauses recognition and releases the voice lease. Select a profile and
+save to resume. Wake-word and reply-voice resources remain available.
+
+Recognition uses full audio context and keeps three seconds before wake detection
+to preserve fast commands. Known subtitle-credit hallucinations are marked
+`ignored_hallucination` with the raw transcript and audio retained for diagnosis.
+Ignoring these phrases does not recover the original speech or guess an action.
