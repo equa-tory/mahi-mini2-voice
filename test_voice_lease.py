@@ -28,3 +28,14 @@ class VoiceLeaseTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError,'ownership expired'):voice.ctl('timer','start','120')
             self.assertEqual(remote.call_count,1)
             self.assertEqual(remote.call_args.args[0][-4:],['voice','lease','check','old-session'])
+
+    def test_weather_display_starts_after_speech_with_custom_duration(self):
+        import voice
+        from voice_ipc import VoiceControl
+        engine=voice.Engine.__new__(voice.Engine);engine.control=VoiceControl()
+        engine.config={'action_catalog':{'builtin:weather':{'display_seconds':7,'responses':['{temperature} {degrees}']}}}
+        privacy={'mode':'local','hardware_mic_muted':False,'mic_muted':False,'privacy':{'desired_muted':False,'applied_muted':False}}
+        def ctl(*args):return privacy if args==('status',) else {'temperature_c':-2}
+        with patch.object(voice.ALLOWED,'is_set',return_value=True),patch.object(voice,'ctl',side_effect=ctl):
+            self.assertIn('минус два',engine.perform('weather',None))
+            self.assertEqual(engine.presentation_after_reply,('weather','show','7'))

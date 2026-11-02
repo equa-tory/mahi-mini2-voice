@@ -291,11 +291,15 @@ class Engine:
             return self.response("timer_status",duration=duration(state["remaining_seconds"])) if state["active"] else self.response("no_timer")
         if intent=="clarify_timer":return self.response("clarify_timer")
         if intent=="weather":
-            data=ctl("weather","status");ctl("weather","show",*([str(self.config.get("action_catalog",{}).get("builtin:weather",{}).get("display_seconds"))] if self.config.get("action_catalog",{}).get("builtin:weather",{}).get("display_seconds") else []))
+            data=ctl("weather","status")
+            seconds=self.config.get("action_catalog",{}).get("builtin:weather",{}).get("display_seconds")
+            self.presentation_after_reply=("weather","show",*([str(seconds)] if seconds else []))
             temperature=round(data["temperature_c"])
             return self.response("weather",temperature=number(temperature),degrees=degrees(temperature),city=data.get("city","Подольске"))
         if intent=="time":
             now=datetime.now(ZoneInfo("Europe/Moscow"))
+            seconds=self.config.get("action_catalog",{}).get("builtin:time",{}).get("display_seconds")
+            self.presentation_after_reply=("clock","text",now.strftime("%H%M"),*([str(seconds)] if seconds else []))
             return self.response("time",time=clock(now.hour,now.minute))
         if intent in ("volume_down","volume_up"):
             ctl("volume","down" if intent=="volume_down" else "up");return self.response(intent)
@@ -303,7 +307,7 @@ class Engine:
         if intent=="action":
             target,sep,name=value.partition(":")
             if sep and target=="speaker":
-                ctl("action","run",name)
+                self.presentation_after_reply=("action","run",name)
                 return self.response(value,action=name)
             response_key=value if sep else "server:"+value
             if sep:value=name
@@ -507,13 +511,17 @@ class Engine:
             if matched and (final or self.matches>=int(self.config.get("wake_confirmations",2))):
                 if not ALLOWED.is_set() or not privacy_allowed(ctl("status")):continue
                 self.control.cancelled.clear()
+                self.presentation_after_reply=None
                 status(phase="listening",wake_count=STATE["wake_count"]+1,error="")
                 threading.Thread(target=indicate,args=("listening",),daemon=True).start()
                 try:self.handle(self.capture_request(b"".join(self.preroll)))
                 except Exception:status(error="voice processing failed")
                 finally:
                     indicate("idle")
-                    try:ctl("clock","clear")
+                    try:
+                        ctl("clock","clear")
+                        presentation=getattr(self,"presentation_after_reply",None)
+                        if presentation and ALLOWED.is_set() and not self.control.cancelled.is_set():ctl(*presentation)
                     except Exception:pass
                     clear_audio();self.rec.Reset();self.preroll.clear();self.matches=0
                     status(phase="idle" if ALLOWED.is_set() else "muted_or_disconnected")
