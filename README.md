@@ -78,7 +78,7 @@ The action catalog imports old `voice.yaml` aliases, intent triggers, and respon
 without changing legacy files merely by reading them. Save actions to persist the
 catalog. Built-ins, named speaker actions, named server actions, and feedback responses
 have stable names. Edit phrases and response variants one per line; one variant is
-chosen randomly per response. Blank action response fields use the editable Default response at the top of the catalog, initially «Готово.». Placeholder validation,
+chosen randomly per response. Blank action response fields use the editable Default response at the top of the catalog, initially «Готово.». Leave the default response empty for silence. Placeholder validation,
 spoken numbers, argument extraction, result mappings, `/run`, and `mini2ctl action run`
 remain supported. Legacy fields are still accepted when no catalog override exists.
 
@@ -170,3 +170,5 @@ recovery interval and non-overlapping ownership, and interrupt an active Pi requ
 center tap. Test rear mute and software mute while each host owns the lease. Compare
 recognition latency using the same WAV input and model on both nodes with
 `python3 benchmark.py /path/to/sample.wav --language ru`.
+
+The Voice & phrases dashboard shows the last ten wake/request interactions, including recognition attempts, matched intent and arguments, response, and completion or error. This diagnostic text is stored in local runtime status, never in Git, and resets when the voice worker restarts. Audio is saved only by explicit recording tests.

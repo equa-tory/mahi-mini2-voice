@@ -43,6 +43,14 @@ def status(**values):
         p.with_suffix(".tmp").write_text(json.dumps(STATE))
         p.with_suffix(".tmp").replace(p)
 
+def voice_event(new=False, **values):
+    """Keep only the ten most recent wake/request interactions in local status."""
+    history=[dict(entry) for entry in STATE.get("history", [])]
+    if new or not history:
+        history.insert(0, {"at":int(time.time()), "outcome":"listening", "attempts":[]})
+    history[0].update(values)
+    status(history=history[:10])
+
 def ssh(command):
     return ["ssh","-T","-i","/secrets/speaker_key","-p","2222",
             "-o","BatchMode=yes","-o","ConnectTimeout=3",
@@ -253,7 +261,7 @@ class Engine:
                 process.terminate()
 
     def say(self,text,speaker=None):
-        if not text or STOP.is_set() or not ALLOWED.is_set() or self.control.cancelled.is_set():return
+        if not text.strip() or STOP.is_set() or not ALLOWED.is_set() or self.control.cancelled.is_set():return
         SPEAKING.set()
         clear_audio()
         try:
@@ -381,8 +389,12 @@ class Engine:
                 condition_on_previous_text=False,vad_filter=False)
             raw_text=" ".join(segment.text for segment in segments)
             text=strip_wake(raw_text,self.wake)
-            if not testing:self.command_text=text
             result=classify(text,*voice_routes(self.config))
+            if not testing:
+                self.command_text=text
+                attempts=list(STATE.get("history", [{}])[0].get("attempts", []))
+                attempts.append({"text":raw_text[:2000], "language":candidate or "auto", "intent":result[0]})
+                voice_event(text=raw_text[:2000], command=text[:2000], intent=result[0], arguments=result[1], attempts=attempts[-4:], outcome="recognized")
             elapsed=round((time.monotonic()-started)*1000)
             status(asr_ms=elapsed,asr_backend=LEASE.backend if LEASE else self.config.get("whisper_model","base"))
             self.control.metrics(asr_ms=elapsed,capture_seconds=round(len(samples)/16000,1))
@@ -403,7 +415,7 @@ class Engine:
         language=self.config.get("speech_language","auto")
         intent,value=self.decode(audio)
         if self.control.cancelled.is_set():return
-        # Never record/log transcripts; only a fixed intent identifier is exposed.
+        # The bounded dashboard history is explicitly enabled for recognition diagnosis.
         status(last_intent=intent,command_count=STATE["command_count"]+1)
         if self.control.active() or self.control.cancelled.is_set():return
         if intent=="empty":
@@ -415,8 +427,12 @@ class Engine:
                 if intent=="empty":return
         if self.control.active() or self.control.cancelled.is_set():return
         if not ALLOWED.is_set() or not privacy_allowed(ctl("status")):return
-        try:self.say(self.perform(intent,value))
-        except Exception:
+        try:
+            reply=self.perform(intent,value)
+            self.say(reply)
+            voice_event(outcome="cancelled" if self.control.cancelled.is_set() else "completed", response=reply)
+        except Exception as error:
+            voice_event(outcome="error", error=str(error)[:300])
             self.say(self.response("error"))
 
     def preview_voice(self):
@@ -515,10 +531,13 @@ class Engine:
                 if not ALLOWED.is_set() or not privacy_allowed(ctl("status")):continue
                 self.control.cancelled.clear()
                 self.presentation_after_reply=None
+                voice_event(new=True, wake=" ".join(words)[:2000])
                 status(phase="listening",wake_count=STATE["wake_count"]+1,error="")
                 threading.Thread(target=indicate,args=("listening",),daemon=True).start()
                 try:self.handle(self.capture_request(b"".join(self.preroll)))
-                except Exception:status(error="voice processing failed")
+                except Exception as error:
+                    voice_event(outcome="error", error=str(error)[:300])
+                    status(error="voice processing failed")
                 finally:
                     indicate("idle")
                     try:

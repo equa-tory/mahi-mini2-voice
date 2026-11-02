@@ -94,3 +94,25 @@ class SpokenReplyTests(unittest.TestCase):
         with patch("voice.ctl") as command:
             self.assertEqual(e.perform("timer_start",120),"")
             command.assert_not_called()
+
+class VoiceHistoryTests(unittest.TestCase):
+    def test_history_is_bounded_and_updates_current_request(self):
+        import voice
+        from unittest.mock import patch
+        state={}
+        with patch.object(voice, "STATE", state), patch.object(voice, "status", side_effect=lambda **values:state.update(values)):
+            for index in range(12):voice.voice_event(new=True, wake=str(index))
+            voice.voice_event(text="таймер", intent="timer_start", outcome="completed")
+        self.assertEqual(len(state["history"]),10)
+        self.assertEqual(state["history"][0]["wake"],"11")
+        self.assertEqual(state["history"][0]["text"],"таймер")
+        self.assertEqual(state["history"][-1]["wake"],"2")
+
+    def test_silent_reply_does_not_invoke_synthesis(self):
+        from voice import Engine
+        from unittest.mock import Mock
+        assistant=object.__new__(Engine)
+        assistant.speech=Mock()
+        assistant.say("")
+        assistant.say("   ")
+        assistant.speech.wav.assert_not_called()

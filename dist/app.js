@@ -91,6 +91,13 @@ async function refreshVoice(){
  $("voiceSummary").textContent=`Wake detections: ${data.wake_count||0} · Requests: ${data.command_count||0}`;
  $("voiceDetail").textContent=`Status: ${data.phase.replaceAll("_"," ")}. Last command: ${data.last_intent||"none"}.`;
  $("voiceConfigError").textContent=data.config_error||data.error||"";
+ const history=$("voiceHistory");history.replaceChildren();
+ if(!data.history?.length)history.textContent="No voice requests yet.";
+ for(const entry of data.history||[]){
+  const row=document.createElement("details"),title=document.createElement("summary"),body=document.createElement("pre");
+  title.textContent=`${new Date(entry.at*1000).toLocaleTimeString()} · ${entry.text||entry.wake||"Wake detected"} → ${entry.intent||"—"} · ${entry.outcome}`;
+  body.textContent=JSON.stringify(entry,null,2);row.append(title,body);history.append(row);
+ }
 }
 async function refreshWeather(){try{const data=await api("/ui/weather");$("weatherTemperature").textContent=Math.round(data.temperature_c)+"°C";$("weatherAge").textContent=(data.forecast?"Hourly forecast":"Current estimate")+" · downloaded "+Math.floor(data.age_seconds/60)+" min ago"+(data.stale?" · older cache":"")}catch(error){$("weatherAge").textContent=error.message}}
 async function freshSpeaker(){return api("/ui/speaker-config")}

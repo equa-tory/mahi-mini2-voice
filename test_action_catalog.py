@@ -54,7 +54,11 @@ class CatalogTests(unittest.TestCase):
         config={'default_response':'Хорошо!','action_catalog':{'speaker:face':{'responses':['']}}}
         self.assertEqual(response(config,'speaker:face'),'Хорошо!')
         self.assertEqual(response({'default_response':'Хорошо!'},'server:new'),'Хорошо!')
-        config['default_response']=''
-        self.assertEqual(response(config,'speaker:face'),'Готово.')
+        for blank in ('', '   ', '\n'):
+            config['default_response']=blank
+            self.assertEqual(response(config,'speaker:face'),'')
+            self.assertEqual(response(config,'server:new'),'')
+        config['action_catalog']['speaker:face']['responses']=['Привет!']
+        self.assertEqual(response(config,'speaker:face'),'Привет!')
         from voice_config import validate_voice
         with self.assertRaises(ValueError):validate_voice({'wake_word':'махи','default_response':'{duration}'})

@@ -83,5 +83,5 @@ def response(config, name, **values):
     lines=entries.get(key,{}).get('responses',[fallback])
     selected=random.choice(lines or [''])
     default=config.get("default_response",DEFAULT_ACTION_RESPONSE)
-    text=selected if selected.strip() else default if default.strip() else DEFAULT_ACTION_RESPONSE
+    text=selected if selected.strip() else default.strip()
     return text.format_map(defaultdict(str,values))
