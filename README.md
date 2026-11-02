@@ -98,6 +98,7 @@ Use 64-bit Raspberry Pi OS (Bookworm or later), or a compatible Debian ARM64 OS.
 Confirm `uname -m` prints `aarch64`. Install Docker and Compose, then clone this
 repository and follow the same config, key, directory permission and model setup steps.
 If needed, add your account to the Docker group and log in again before using Docker.
+On UmbrelOS, use `sudo docker compose` if Docker group access is reset after reboot.
 
 Set the Pi's reserved address in `.env` and use the same automation token:
 
