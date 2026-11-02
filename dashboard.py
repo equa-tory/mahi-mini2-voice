@@ -23,7 +23,7 @@ CONTROL={
  "light":{"get","enable","gain","integration"},
  "timer":{"pick","increase","decrease","close","selection","start","status","cancel","dismiss","sound-test","sound-level"},
  "weather":{"show","status","refresh"},
- "action":{"run","cancel"},
+ "action":{"run","cancel","stop"},
 }
 
 def control(args,send):
@@ -118,7 +118,7 @@ def post(path,data,send,validate_actions):
         with LOCK:
             with open(VOICE_PATH) as f:current=yaml.safe_load(f)
             # UI can edit behavior and voices; runtime/model installation is separate.
-            permitted={"wake_word","wake_confirmations","speech_language","tts_speaker","tts_volume","aliases","intent_triggers","whisper_model","microphone_gain","speech_threshold","silence_seconds","max_listen_seconds","auto_threshold","microphone_channel","assistant_face","responses"}
+            permitted={"wake_word","wake_confirmations","speech_language","tts_speaker","tts_volume","aliases","intent_triggers","whisper_model","microphone_gain","speech_threshold","silence_seconds","max_listen_seconds","auto_threshold","microphone_channel","assistant_face","responses","history_limit"}
             if set(data)-permitted:raise ValueError("unsupported voice setting")
             if data.get("wake_word",current["wake_word"])!=current["wake_word"]:
                 validate_voice({**current,**data})

@@ -37,3 +37,5 @@ The Pi lost power/network connectivity during the first recognition benchmark.
 After reboot its kernel repeatedly reported `Undervoltage detected!`. Pi recognition
 latency remains unmeasured; further load testing was deferred. Software ownership
 checks do not establish hardware reliability under these power conditions.
+
+Recent voice diagnostics and cancellation update: 58 Python tests pass (two optional dependency tests skipped on the host), Go race tests and vet pass, and JavaScript syntax checks pass. Browser verification saved and reloaded a custom history length, retained existing history across worker restart, and loaded the global cancel catalog entry without page errors. Live speaker checks confirmed the configured timer → picker → assistant → local cancellation order and timer, picker, and local cancellation operations. Standby ownership remains disabled on the deployed speaker.

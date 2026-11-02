@@ -2,7 +2,7 @@ import string
 RESPONSE_FIELDS = {"duration", "temperature", "city", "degrees", "time", "action"}
 DEFAULT_RESPONSES = {
  "timer_start":"Таймер установлен. До сигнала: {duration}.",
- "timer_cancel":"Таймер отменён.", "no_timer":"Сейчас нет таймера.",
+ "cancel":"", "timer_cancel":"Таймер отменён.", "no_timer":"Сейчас нет таймера.",
  "timer_status":"До сигнала: {duration}.", "clarify_timer":"На сколько минут или секунд поставить таймер?",
  "weather":"По сохранённому прогнозу, в {city} {temperature} {degrees}.",
  "time":"Сейчас {time}.", "volume_down":"Хорошо.", "volume_up":"Хорошо.",
@@ -41,6 +41,8 @@ def validate_voice(config):
     if not 3<=float(config.get("max_listen_seconds",8))<=15:raise ValueError("listening duration must be3..15seconds")
     if not isinstance(config.get("auto_threshold",True),bool):raise ValueError("auto threshold must be true or false")
     if config.get("microphone_channel",0) not in (0,2,4,6):raise ValueError("invalid microphone channel")
+    limit=config.get("history_limit",10)
+    if isinstance(limit,bool) or not isinstance(limit,int) or not 1<=limit<=200:raise ValueError("voice history must be 1..200 requests")
     validate_templates(config.get("responses",{}))
     validate_templates({"unknown":config.get("default_response","Готово.")})
     from action_catalog import validate_catalog

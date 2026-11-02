@@ -72,13 +72,14 @@ func defaults() Configuration {
 		"timer.close":    {Type: "timer", Args: []string{"close"}},
 		"timer.cancel":   {Type: "timer", Args: []string{"cancel"}},
 		"assistant.stop": {Type: "assistant.stop"},
+		"cancel":         {Type: "cancel.ordered"},
 		"local.cancel":   {Type: "local.cancel"},
 		"playback":       {Type: "playback.toggle"}, "pair": {Type: "bluetooth.pair"}, "up": {Type: "volume", Args: []string{"up"}}, "down": {Type: "volume", Args: []string{"down"}},
 	}, Faces: map[string][]Frame{}}
 }
 func defaultConditions() map[string][]BindingRule {
 	return map[string][]BindingRule{
-		"center.tap":   {{When: "assistant.active", Action: "assistant.stop", Consume: true}, {When: "timer.active", Action: "timer.cancel", Consume: true}, {When: "timer.selecting", Action: "timer.close", Consume: true}, {When: "local.active", Action: "local.cancel", Consume: true}},
+		"center.tap":   {{When: "timer.active", Action: "timer.cancel", Consume: true}, {When: "timer.selecting", Action: "timer.close", Consume: true}, {When: "assistant.active", Action: "assistant.stop", Consume: true}, {When: "local.active", Action: "local.cancel", Consume: true}},
 		"plus.press":   {{When: "timer.selecting", Action: "timer.increase", Consume: true}},
 		"plus.repeat":  {{When: "timer.selecting", Action: "timer.increase", Consume: true}},
 		"minus.press":  {{When: "timer.selecting", Action: "timer.decrease", Consume: true}},
@@ -135,7 +136,7 @@ func validateAction(a Action, depth int) (int, error) {
 		if a.Type == "mute" {
 			return 12000, nil
 		}
-	case "playback.toggle", "bluetooth.pair", "assistant.stop", "local.cancel":
+	case "playback.toggle", "bluetooth.pair", "assistant.stop", "local.cancel", "cancel.ordered":
 		if len(a.Args) != 0 {
 			return 0, errors.New("action takes no arguments")
 		}
@@ -195,7 +196,7 @@ func decodeConfiguration(reader io.Reader) (Configuration, error) {
 		c.Bindings = map[string]string{}
 	}
 	for name, action := range defaults().Actions {
-		if strings.HasPrefix(name, "timer.") || strings.HasPrefix(name, "assistant.") || name == "local.cancel" {
+		if strings.HasPrefix(name, "timer.") || strings.HasPrefix(name, "assistant.") || name == "local.cancel" || name == "cancel" {
 			if _, ok := c.Actions[name]; !ok {
 				c.Actions[name] = action
 			}
@@ -333,6 +334,41 @@ func needsServer(a Action) bool {
 	return false
 }
 
+// Voice and button cancellation share the configured center-tap priority rules.
+func nextCancellation() string {
+	configMu.RLock()
+	rules := append([]BindingRule(nil), activeConfig.Conditional["center.tap"]...)
+	configMu.RUnlock()
+	for _, rule := range rules {
+		matched := false
+		switch rule.Action {
+		case "timer.cancel":
+			matched = speakerTimer.snapshot(time.Now())["active"] == true
+		case "timer.close":
+			matched = pickerActive()
+		case "assistant.stop":
+			matched = assistantActive()
+		case "local.cancel":
+			matched = localActionActive()
+		}
+		if matched {
+			return rule.Action
+		}
+	}
+	return ""
+}
+
+func cancelOrdered() (string, error) {
+	name := nextCancellation()
+	if name == "" {
+		return "", nil
+	}
+	configMu.RLock()
+	action := activeConfig.Actions[name]
+	configMu.RUnlock()
+	return name, executeAction(action)
+}
+
 func idleColor() [3]int { configMu.RLock(); defer configMu.RUnlock(); return activeConfig.Idle }
 func triggerBinding(button, kind string, count int) {
 	if read(dir+"default") != "local" || read(dir+"button-actions") == "0" {
@@ -383,6 +419,16 @@ func enqueue(name string) (uint64, error) {
 		return 0, errors.New("unknown action")
 	}
 	j := invocation{invocationID.Add(1), name, a}
+	if a.Type == "cancel.ordered" {
+		actionEvent(j, "action_started", "")
+		err := executeAction(a)
+		if err != nil {
+			actionEvent(j, "action_failed", err.Error())
+		} else {
+			actionEvent(j, "action_completed", "")
+		}
+		return j.ID, err
+	}
 	queue := actionQueue
 	if needsServer(a) {
 		queue = remoteActionQueue
@@ -433,6 +479,9 @@ func executeAction(a Action) error {
 	case "local.cancel":
 		cancelLocalAction(0)
 		return nil
+	case "cancel.ordered":
+		_, err := cancelOrdered()
+		return err
 	case "assistant.stop":
 		return stopAssistant()
 	case "server.request":
@@ -552,6 +601,10 @@ func extension(args []string) (any, error, bool) {
 		defer configMu.RUnlock()
 		return activeConfig.Actions, nil, true
 	case "action":
+		if len(args) == 2 && args[1] == "stop" {
+			value, err := cancelOrdered()
+			return value, err, true
+		}
 		if (len(args) == 2 || len(args) == 3) && args[1] == "cancel" {
 			var id uint64
 			if len(args) == 3 {

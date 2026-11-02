@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -57,4 +58,33 @@ func TestServerPresentationsDoNotCreateLocalCancellation(t *testing.T) {
 	if localActionActive() {
 		t.Fatal("server_hello presentation became cancellable")
 	}
+}
+
+func TestOrderedCancelTimerThenPicker(t *testing.T) {
+	oldConfig := activeConfig
+	oldState, oldPath, oldSelection, oldUntil := speakerTimer.state, speakerTimer.path, speakerTimer.selection, speakerTimer.selectionUntil
+	defer func() {
+		activeConfig = oldConfig
+		speakerTimer.state = oldState
+		speakerTimer.path = oldPath
+		speakerTimer.selection = oldSelection
+		speakerTimer.selectionUntil = oldUntil
+	}()
+	activeConfig = defaults()
+	speakerTimer.path = filepath.Join(t.TempDir(), "timer.json")
+	speakerTimer.state = timerState{Started: time.Now(), Deadline: time.Now().Add(time.Minute)}
+	speakerTimer.selection = 3
+	speakerTimer.selectionUntil = time.Now().Add(time.Minute)
+	got := nextCancellation()
+	if got != "timer.cancel" {
+		t.Fatal(got)
+	}
+	speakerTimer.state = timerState{}
+	speakerTimer.selection = 3
+	speakerTimer.selectionUntil = time.Now().Add(time.Minute)
+	got = nextCancellation()
+	if got != "timer.close" {
+		t.Fatal(got)
+	}
+
 }

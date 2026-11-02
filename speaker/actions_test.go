@@ -111,7 +111,7 @@ func TestConditionalBindingsValidation(t *testing.T) {
 		}
 	}
 	c, e := decodeConfiguration(strings.NewReader("version: 1\n"))
-	if e != nil || c.Bindings["center.triple_tap"] != "timer.pick" || len(c.Conditional["center.tap"]) != 4 || c.Conditional["center.tap"][0].When != "assistant.active" {
+	if e != nil || c.Bindings["center.triple_tap"] != "timer.pick" || len(c.Conditional["center.tap"]) != 4 || c.Conditional["center.tap"][0].When != "timer.active" {
 		t.Fatal(c, e)
 	}
 	c, e = decodeConfiguration(strings.NewReader("version: 1\nconditional_bindings: {}\nbindings: {plus.double_tap: timer.pick}\n"))

@@ -59,7 +59,7 @@ class NumberAndKeywordTests(unittest.TestCase):
     def test_context_keywords_and_numbers(self):
         from voice_numbers import number,duration,clock
         self.assertEqual(classify("сказала плохо какая погода"),("weather",None))
-        self.assertEqual(classify("отмени"),("timer_cancel",None))
+        self.assertEqual(classify("отмени"),("cancel",None))
         self.assertEqual(classify("запусти таймер 5мин"),("timer_start",300))
         self.assertEqual(number(-12),"минус двенадцать")
         self.assertEqual(duration(125),"две минуты и пять секунд")
@@ -127,3 +127,27 @@ class VoiceHistoryTests(unittest.TestCase):
             with wave.open(str(pathlib.Path(directory)/(name+".wav"))) as audio:
                 self.assertEqual(audio.getframerate(),16000)
                 self.assertEqual(audio.readframes(160),b"\x01\x00"*160)
+
+    def test_history_limit_validation(self):
+        from voice_config import validate_voice
+        for limit in (0,201,True,"10"):
+            with self.assertRaises(ValueError):validate_voice({"wake_word":"махи","history_limit":limit})
+        validate_voice({"wake_word":"махи","history_limit":25})
+
+    def test_legacy_generic_stop_uses_ordered_cancel(self):
+        from action_catalog import voice_routes, catalog
+        cfg={"action_catalog":{"builtin:timer_cancel":{"phrases":["stop","отмени таймер"],"responses":["Отменила."]}}}
+        self.assertEqual(classify("Махи стоп",*voice_routes(cfg)),("cancel",None))
+        self.assertEqual(classify("stop",*voice_routes(cfg)),("cancel",None))
+        self.assertEqual(classify("отмени таймер",*voice_routes(cfg)),("timer_cancel",None))
+        entries=catalog(cfg)
+        self.assertNotIn("stop",entries["builtin:timer_cancel"]["phrases"])
+        self.assertIn("stop",entries["builtin:cancel"]["phrases"])
+
+    def test_custom_history_count(self):
+        import voice
+        from unittest.mock import patch
+        state={"history_limit":3}
+        with patch.object(voice,"STATE",state), patch.object(voice,"status",side_effect=lambda **values:state.update(values)):
+            for _ in range(8):voice.voice_event(new=True)
+        self.assertEqual(len(state["history"]),3)

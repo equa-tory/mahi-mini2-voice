@@ -29,6 +29,13 @@ from voice_numbers import number, duration, clock
 STOP = threading.Event()
 STATE_LOCK = threading.Lock()
 STATE = {"phase":"starting","wake_count":0,"command_count":0,"error":""}
+# Preserve the bounded diagnostic history across worker restarts.
+try:
+    previous=json.loads(pathlib.Path("/state/status.json").read_text())
+    limit=previous.get("history_limit",10)
+    if isinstance(limit,int) and not isinstance(limit,bool) and 1<=limit<=200:
+        STATE.update(history_limit=limit,history=previous.get("history",[])[:limit])
+except (OSError,ValueError,TypeError):pass
 ALLOWED = threading.Event()
 AUDIO = queue.Queue(maxsize=20)
 STREAM_LOCK = threading.Lock()
@@ -45,22 +52,23 @@ def status(**values):
         p.with_suffix(".tmp").replace(p)
 
 def voice_event(new=False, **values):
-    """Keep only the ten most recent wake/request interactions in local status."""
+    """Keep the configured number of recent wake/request interactions in local status."""
     history=[dict(entry) for entry in STATE.get("history", [])]
     if new or not history:
         history.insert(0, {"at":int(time.time()), "outcome":"listening", "attempts":[]})
     history[0].update(values)
-    status(history=history[:10])
+    status(history=history[:STATE.get("history_limit",10)])
 
 HISTORY_AUDIO = pathlib.Path("/state/voice-history")
 
 def record_request_audio(audio):
     HISTORY_AUDIO.mkdir(parents=True, exist_ok=True)
-    name=uuid.uuid4().hex
+    current=STATE.get("history", [{}])[0] if STATE.get("history") else {}
+    name=current.get("audio_id") or uuid.uuid4().hex
     with wave.open(str(HISTORY_AUDIO / (name+".wav")), "wb") as output:
         output.setnchannels(1);output.setsampwidth(2);output.setframerate(16000)
         output.writeframes(audio)
-    for old in sorted(HISTORY_AUDIO.glob("*.wav"), key=lambda p:p.stat().st_mtime, reverse=True)[10:]:
+    for old in sorted(HISTORY_AUDIO.glob("*.wav"), key=lambda p:p.stat().st_mtime, reverse=True)[STATE.get("history_limit",10):]:
         old.unlink(missing_ok=True)
     voice_event(audio_id=name, audio_seconds=round(len(audio)/32000,2))
 
@@ -228,6 +236,7 @@ class Engine:
         global LEASE
         LEASE=VoiceLease(ctl,model=config.get("whisper_model","base"))
         self.config=config
+        status(history_limit=config.get("history_limit",10))
         self.control=VoiceControl()
         self.play_lock=threading.Lock()
         self.playback=None
@@ -309,6 +318,12 @@ class Engine:
         if self.control.active():return ""
         if not ALLOWED.is_set() or not privacy_allowed(ctl("status")):
             return ""
+        if intent=="cancel":
+            # This request is the cancellation command, not an assistant job to stop.
+            status(phase="idle")
+            cancelled=ctl("action","stop")
+            voice_event(cancelled_action=cancelled)
+            return self.response("cancel")
         if intent=="timer_start":
             ctl("timer","start",str(value))
             return self.response("timer_start",duration=duration(value))
@@ -388,6 +403,8 @@ class Engine:
             if fresh.get("microphone_channel",0)!=self.config.get("microphone_channel",0):
                 stop_stream();clear_audio();self.preroll.clear();self.rec.Reset()
             self.config=fresh
+            status(history_limit=fresh.get("history_limit",10),history=STATE.get("history",[])[:fresh.get("history_limit",10)])
+            for old in sorted(HISTORY_AUDIO.glob("*.wav"),key=lambda p:p.stat().st_mtime,reverse=True)[fresh.get("history_limit",10):]:old.unlink(missing_ok=True)
             if LEASE:LEASE.configure_model(fresh.get("whisper_model","base"))
             self.config_source=raw
             status(config_error="",tts_speaker=fresh.get("tts_speaker","irina"),wake_word=self.wake)
@@ -446,13 +463,18 @@ class Engine:
             if followup:
                 record_request_audio(followup)
                 intent,value=self.decode(followup)
-                if intent=="empty":return
+                if intent=="empty":
+                    voice_event(outcome="no_speech")
+                    return
+            else:
+                voice_event(outcome="no_speech")
+                return
         if self.control.active() or self.control.cancelled.is_set():return
         if not ALLOWED.is_set() or not privacy_allowed(ctl("status")):return
         try:
             reply=self.perform(intent,value)
             self.say(reply)
-            voice_event(outcome="cancelled" if self.control.cancelled.is_set() else "completed", response=reply)
+            voice_event(outcome="cancelled" if self.control.cancelled.is_set() else "unrecognized" if intent=="unknown" else "ambiguous" if intent=="ambiguous" else "completed", response=reply)
         except Exception as error:
             voice_event(outcome="error", error=str(error)[:300])
             self.say(self.response("error"))

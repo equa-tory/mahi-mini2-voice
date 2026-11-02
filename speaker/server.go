@@ -60,7 +60,7 @@ func assistantActive() bool {
 		Phase     string `json:"phase"`
 		UpdatedAt int64  `json:"updated_at"`
 	}
-	if json.NewDecoder(io.LimitReader(response.Body, 4096)).Decode(&state) != nil {
+	if json.NewDecoder(io.LimitReader(response.Body, 4<<20)).Decode(&state) != nil {
 		return false
 	}
 	if state.UpdatedAt > 0 && time.Now().Unix()-state.UpdatedAt > 8 {

@@ -91,7 +91,7 @@ async function refreshVoice(){
  $("voiceSummary").textContent=`Wake detections: ${data.wake_count||0} · Requests: ${data.command_count||0}`;
  $("voiceDetail").textContent=`Status: ${data.phase.replaceAll("_"," ")}. Last command: ${data.last_intent||"none"}.`;
  $("voiceConfigError").textContent=data.config_error||data.error||"";
- const history=$("voiceHistory");history.replaceChildren();
+ const history=$("voiceHistory"),entries=JSON.stringify(data.history||[]);if(history.dataset.entries===entries)return;history.dataset.entries=entries;history.replaceChildren();
  if(!data.history?.length)history.textContent="No voice requests yet.";
  for(const entry of data.history||[]){
   const row=document.createElement("details"),title=document.createElement("summary"),body=document.createElement("pre");
@@ -160,6 +160,7 @@ async function loadVoice(){
  $("micChannel").value=voiceConfig.microphone_channel??0;$("maxListen").value=voiceConfig.max_listen_seconds??8;
 
 $("voiceChoice").value=voiceConfig.tts_speaker||"baya";$("speechLevel").value=Math.round((voiceConfig.tts_volume??.65)*100);$("speechLevelValue").textContent=$("speechLevel").value+"%";$("voiceLanguage").value=voiceConfig.speech_language||"ru";
+ $("historyLimit").value=voiceConfig.history_limit??10;
  $("recognitionModel").value=voiceConfig.whisper_model||"base";
  $("micGain").value=voiceConfig.microphone_gain??4;$("gainValue").textContent=$("micGain").value+"×";
  $("speechThreshold").value=voiceConfig.speech_threshold??80;$("thresholdValue").textContent=$("speechThreshold").value;
@@ -202,6 +203,7 @@ bind("saveRingColors",async()=>{const config=await freshSpeaker();config.active_
 bind("testRing",async()=>{await command(["ring","animate",$("ringAnimation").value,$("ringSeconds").value])});
 $("speechLevel").addEventListener("input",()=>{$("speechLevelValue").textContent=$("speechLevel").value+"%"});
 bind("voicePreview",async()=>{await api("/ui/voice-preview",{speaker:$("voiceChoice").value});toast("Voice sample queued")});
+bind("saveHistoryLimit",async()=>{await api("/ui/voice-config",{history_limit:Number($("historyLimit").value)});toast("History length saved")});
 bind("saveVoice",async()=>{
  await api("/ui/voice-config",{wake_word:$("wakePhrase").value,assistant_face:$("assistantFace").value,microphone_channel:Number($("micChannel").value),max_listen_seconds:Number($("maxListen").value),tts_speaker:$("voiceChoice").value,tts_volume:Number($("speechLevel").value)/100,speech_language:$("voiceLanguage").value,whisper_model:$("recognitionModel").value,microphone_gain:Number($("micGain").value),speech_threshold:Number($("speechThreshold").value),silence_seconds:Number($("silenceSeconds").value),auto_threshold:$("autoThreshold").checked});
  await loadVoice();toast("Voice settings saved; apply when idle");setTimeout(refreshVoice,1500);
@@ -249,7 +251,7 @@ async function loadCatalog(){
   if(target!=="feedback") {const run=document.createElement("button");run.textContent="Run";run.onclick=event=>{event.preventDefault();event.stopPropagation();return busy(run,async()=>{
    if(target==="speaker")await command(["action","run",name]);
    else if(target==="server")await api("/run",{action:name,args:readActionArgs(row,serverActions[name]||{})})
-   else {const args={timer_start:["timer","pick"],timer_cancel:["timer","cancel"],timer_status:["timer","status"],weather:["weather","show"],time:["clock","clear"],volume_down:["volume","down"],volume_up:["volume","up"]};await command(args[name])}
+   else {const args={cancel:["action","stop"],timer_start:["timer","pick"],timer_cancel:["timer","cancel"],timer_status:["timer","status"],weather:["weather","show"],time:["clock","clear"],volume_down:["volume","down"],volume_up:["volume","up"]};await command(args[name])}
    toast("Action requested")})};heading.append(run)}
   const bound=Object.entries(speakerConfig.bindings||{}).filter(([,action])=>target==="speaker"&&action===name).map(([key])=>key);if(bound.length){const info=document.createElement("p");info.textContent="Buttons: "+bound.join(", ");row.append(info)}
   $("actionCatalog").append(row);

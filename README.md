@@ -171,6 +171,8 @@ center tap. Test rear mute and software mute while each host owns the lease. Com
 recognition latency using the same WAV input and model on both nodes with
 `python3 benchmark.py /path/to/sample.wav --language ru`.
 
-The Voice & phrases dashboard shows the last ten wake/request interactions, including recognition attempts, matched intent and arguments, response, and completion or error. This diagnostic text is stored in local runtime status, never in Git, and resets when the voice worker restarts. The latest ten captured request audio clips are also kept in `/state/voice-history` for authenticated dashboard playback; older clips are automatically deleted. Explicit recording tests are stored separately.
+The Voice & phrases dashboard shows the recent wake/request interactions, including recognition attempts, matched intent and arguments, response, and completion or error. This diagnostic text is stored in local runtime status, never in Git, and survives voice-worker restarts. Set the retained request count from 1 to 200 on the dashboard (default 10). The captured request audio clips up to the configured limit are also kept in `/state/voice-history` for authenticated dashboard playback; older clips are automatically deleted. Explicit recording tests are stored separately.
 
 To disable standby failover temporarily, set `voice_standby_disabled: true` in the speaker configuration (Buttons & actions → speaker YAML). The speaker rejects standby acquisitions and renewals while the primary continues normally. Set it to false to restore standby eligibility.
+
+The global voice `cancel` command uses the cancellation actions in the speaker’s center-tap priority list, without invoking playback fallback. The default order is timer cancellation, timer picker close, assistant stop, then local action cancellation. Explicit timer-cancel phrases remain supported.

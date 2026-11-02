@@ -22,8 +22,18 @@ def catalog(config, speaker=None, server=None):
         key = 'server:'+name
         entries.setdefault(key, {'phrases': [], 'responses': [config.get('responses', {}).get('action', '')], 'display_seconds': None})['phrases'].append(phrase)
     entries.update(copy.deepcopy(config.get('action_catalog', {})))
+    migrate_cancel_phrases(entries)
     return entries
 
+
+def migrate_cancel_phrases(entries):
+    generic=set(DEFAULT_TRIGGERS["cancel"])
+    old=entries.get("builtin:timer_cancel",{})
+    moved=[p for p in old.get("phrases",[]) if p.strip().lower() in generic]
+    if moved:
+        old["phrases"]=[p for p in old["phrases"] if p not in moved]
+        new=entries.setdefault("builtin:cancel", {"phrases":list(DEFAULT_TRIGGERS["cancel"]),"responses":[""],"display_seconds":None})
+        new["phrases"]=list(dict.fromkeys(new.get("phrases",[])+moved))
 
 def validate_catalog(entries, server=None, legacy_response=None):
     if not isinstance(entries, dict) or len(entries) > 500:
@@ -61,7 +71,7 @@ def voice_routes(config):
     aliases = dict(config.get('aliases', {}))
     triggers = dict(config.get('intent_triggers', {}))
     # Explicit entries replace the imported legacy phrases for that action.
-    entries=config.get('action_catalog',{})
+    entries=catalog(config)
     named={key[7:] for key in entries if key.startswith('server:')}
     aliases={p:n for p,n in aliases.items() if n not in named}
     for key, entry in entries.items():

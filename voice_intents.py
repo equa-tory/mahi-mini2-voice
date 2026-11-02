@@ -47,7 +47,8 @@ def duration_from_text(text):
 
 DEFAULT_TRIGGERS={
  "timer_start":["таймер","timer","засеки","засекай","засечь","отсчитай"],
- "timer_cancel":["отмени","останови","cancel","stop","отмени таймер","отменить таймер","выключи таймер","останови таймер","убери таймер","stop timer","cancel timer","dismiss timer"],
+ "cancel":["стоп","останови","отмени","отмена","хватит","stop","cancel"],
+ "timer_cancel":["отмени таймер","отменить таймер","выключи таймер","останови таймер","убери таймер","stop timer","cancel timer","dismiss timer"],
  "timer_status":["сколько осталось","сколько времени осталось","timer status","remaining time"],
  "weather":["погода","погоду","погоды","пагода","температура","сколько градусов","weather"],
  "time":["который час","сколько времени","what time","time is it"],
