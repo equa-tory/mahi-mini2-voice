@@ -14,6 +14,7 @@ import threading
 import time
 import urllib.request
 import wave
+import uuid
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -50,6 +51,18 @@ def voice_event(new=False, **values):
         history.insert(0, {"at":int(time.time()), "outcome":"listening", "attempts":[]})
     history[0].update(values)
     status(history=history[:10])
+
+HISTORY_AUDIO = pathlib.Path("/state/voice-history")
+
+def record_request_audio(audio):
+    HISTORY_AUDIO.mkdir(parents=True, exist_ok=True)
+    name=uuid.uuid4().hex
+    with wave.open(str(HISTORY_AUDIO / (name+".wav")), "wb") as output:
+        output.setnchannels(1);output.setsampwidth(2);output.setframerate(16000)
+        output.writeframes(audio)
+    for old in sorted(HISTORY_AUDIO.glob("*.wav"), key=lambda p:p.stat().st_mtime, reverse=True)[10:]:
+        old.unlink(missing_ok=True)
+    voice_event(audio_id=name, audio_seconds=round(len(audio)/32000,2))
 
 def ssh(command):
     return ["ssh","-T","-i","/secrets/speaker_key","-p","2222",
@@ -411,6 +424,7 @@ class Engine:
         import numpy as np
         if not audio or self.control.cancelled.is_set():return
         if not ALLOWED.is_set() or not privacy_allowed(ctl("status")):return
+        record_request_audio(audio)
         status(phase="thinking");indicate("thinking")
         language=self.config.get("speech_language","auto")
         intent,value=self.decode(audio)
@@ -423,6 +437,7 @@ class Engine:
             clear_audio();status(phase="listening");indicate("listening")
             followup=self.capture_request(b"")
             if followup:
+                record_request_audio(followup)
                 intent,value=self.decode(followup)
                 if intent=="empty":return
         if self.control.active() or self.control.cancelled.is_set():return

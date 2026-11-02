@@ -171,4 +171,4 @@ center tap. Test rear mute and software mute while each host owns the lease. Com
 recognition latency using the same WAV input and model on both nodes with
 `python3 benchmark.py /path/to/sample.wav --language ru`.
 
-The Voice & phrases dashboard shows the last ten wake/request interactions, including recognition attempts, matched intent and arguments, response, and completion or error. This diagnostic text is stored in local runtime status, never in Git, and resets when the voice worker restarts. Audio is saved only by explicit recording tests.
+The Voice & phrases dashboard shows the last ten wake/request interactions, including recognition attempts, matched intent and arguments, response, and completion or error. This diagnostic text is stored in local runtime status, never in Git, and resets when the voice worker restarts. The latest ten captured request audio clips are also kept in `/state/voice-history` for authenticated dashboard playback; older clips are automatically deleted. Explicit recording tests are stored separately.

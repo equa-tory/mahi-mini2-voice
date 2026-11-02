@@ -96,7 +96,9 @@ async function refreshVoice(){
  for(const entry of data.history||[]){
   const row=document.createElement("details"),title=document.createElement("summary"),body=document.createElement("pre");
   title.textContent=`${new Date(entry.at*1000).toLocaleTimeString()} · ${entry.text||entry.wake||"Wake detected"} → ${entry.intent||"—"} · ${entry.outcome}`;
-  body.textContent=JSON.stringify(entry,null,2);row.append(title,body);history.append(row);
+  body.textContent=JSON.stringify(entry,null,2);row.append(title,body);
+  if(entry.audio_id){const play=document.createElement("button");play.textContent="Listen to request";play.onclick=()=>busy(play,async()=>{const clip=await api("/ui/voice-audio?id="+encodeURIComponent(entry.audio_id));const player=document.createElement("audio");player.controls=true;player.src="data:audio/wav;base64,"+clip.audio;play.replaceWith(player);await player.play()});row.append(play)}
+  history.append(row);
  }
 }
 async function refreshWeather(){try{const data=await api("/ui/weather");$("weatherTemperature").textContent=Math.round(data.temperature_c)+"°C";$("weatherAge").textContent=(data.forecast?"Hourly forecast":"Current estimate")+" · downloaded "+Math.floor(data.age_seconds/60)+" min ago"+(data.stale?" · older cache":"")}catch(error){$("weatherAge").textContent=error.message}}

@@ -116,3 +116,14 @@ class VoiceHistoryTests(unittest.TestCase):
         assistant.say("")
         assistant.say("   ")
         assistant.speech.wav.assert_not_called()
+
+    def test_request_audio_is_valid_wav_and_retention_is_bounded(self):
+        import voice, tempfile, pathlib, wave
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as directory, patch.object(voice,"HISTORY_AUDIO",pathlib.Path(directory)), patch.object(voice,"voice_event") as event:
+            for _ in range(12):voice.record_request_audio(b"\x01\x00"*160)
+            self.assertEqual(len(list(pathlib.Path(directory).glob("*.wav"))),10)
+            name=event.call_args.kwargs["audio_id"]
+            with wave.open(str(pathlib.Path(directory)/(name+".wav"))) as audio:
+                self.assertEqual(audio.getframerate(),16000)
+                self.assertEqual(audio.readframes(160),b"\x01\x00"*160)

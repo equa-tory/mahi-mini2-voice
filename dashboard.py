@@ -1,4 +1,7 @@
 """Authenticated LAN dashboard bridge; all hardware validation stays in mini2ctl."""
+import base64
+import re
+import urllib.parse
 import fcntl
 import json
 import os
@@ -36,6 +39,11 @@ def rpc(args,send):
     return result.get("data")
 
 def get(path,send,load_actions):
+    if path.startswith("/ui/voice-audio?"):
+        name=urllib.parse.parse_qs(urllib.parse.urlsplit(path).query).get("id",[""])[0]
+        if not re.fullmatch(r"[0-9a-f]{32}",name):raise ValueError("invalid audio id")
+        audio=pathlib.Path("/state/voice-history")/(name+".wav")
+        return {"audio":base64.b64encode(audio.read_bytes()).decode()}
     if path=="/ui/catalog":
         from action_catalog import catalog
         with open(VOICE_PATH) as f: config=yaml.safe_load(f)
