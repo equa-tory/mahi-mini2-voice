@@ -65,3 +65,22 @@ func TestVoiceLeaseInterruptedRecoveryResetsStability(t *testing.T) {
 	voiceOwner = voiceLease{}
 	primaryCandidate = ""
 }
+
+func TestDisabledStandbyCannotAcquireOrRenew(t *testing.T) {
+	old := activeConfig
+	oldOwner := voiceOwner
+	defer func() { activeConfig = old; voiceOwner = oldOwner }()
+	activeConfig.VoiceStandbyDisabled = true
+	voiceOwner = voiceLease{}
+	now := time.Now()
+	for _, op := range []string{"acquire", "renew"} {
+		reply, err := leaseOperation([]string{op, "pi", "standby", "http://127.0.0.1:8787", "cpu"}, now)
+		if err != nil || reply.(map[string]any)["granted"].(bool) {
+			t.Fatal("disabled standby granted", err)
+		}
+	}
+	reply, err := leaseOperation([]string{"acquire", "main", "primary", "http://127.0.0.1:8787", "gpu"}, now)
+	if err != nil || !reply.(map[string]any)["granted"].(bool) {
+		t.Fatal("primary denied", err)
+	}
+}

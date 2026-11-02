@@ -172,3 +172,5 @@ recognition latency using the same WAV input and model on both nodes with
 `python3 benchmark.py /path/to/sample.wav --language ru`.
 
 The Voice & phrases dashboard shows the last ten wake/request interactions, including recognition attempts, matched intent and arguments, response, and completion or error. This diagnostic text is stored in local runtime status, never in Git, and resets when the voice worker restarts. The latest ten captured request audio clips are also kept in `/state/voice-history` for authenticated dashboard playback; older clips are automatically deleted. Explicit recording tests are stored separately.
+
+To disable standby failover temporarily, set `voice_standby_disabled: true` in the speaker configuration (Buttons & actions → speaker YAML). The speaker rejects standby acquisitions and renewals while the primary continues normally. Set it to false to restore standby eligibility.

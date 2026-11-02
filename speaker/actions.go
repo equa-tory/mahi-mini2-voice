@@ -30,17 +30,18 @@ type BindingRule struct {
 	Consume bool   `yaml:"consume" json:"consume"`
 }
 type Configuration struct {
-	RulesVersion   int                      `yaml:"action_rules_version,omitempty"`
-	DisplaySeconds int                      `yaml:"display_seconds,omitempty"`
-	Conditional    map[string][]BindingRule `yaml:"conditional_bindings"`
-	RepeatDelay    int                      `yaml:"repeat_delay_ms"`
-	RepeatInterval int                      `yaml:"repeat_interval_ms"`
-	Active         [3]int                   `yaml:"active_rgb"`
-	Version        int                      `yaml:"version"`
-	Idle           [3]int                   `yaml:"idle_rgb"`
-	Bindings       map[string]string        `yaml:"bindings"`
-	Actions        map[string]Action        `yaml:"actions"`
-	Faces          map[string][]Frame       `yaml:"faces"`
+	VoiceStandbyDisabled bool                     `yaml:"voice_standby_disabled,omitempty"`
+	RulesVersion         int                      `yaml:"action_rules_version,omitempty"`
+	DisplaySeconds       int                      `yaml:"display_seconds,omitempty"`
+	Conditional          map[string][]BindingRule `yaml:"conditional_bindings"`
+	RepeatDelay          int                      `yaml:"repeat_delay_ms"`
+	RepeatInterval       int                      `yaml:"repeat_interval_ms"`
+	Active               [3]int                   `yaml:"active_rgb"`
+	Version              int                      `yaml:"version"`
+	Idle                 [3]int                   `yaml:"idle_rgb"`
+	Bindings             map[string]string        `yaml:"bindings"`
+	Actions              map[string]Action        `yaml:"actions"`
+	Faces                map[string][]Frame       `yaml:"faces"`
 }
 
 var configMu sync.RWMutex

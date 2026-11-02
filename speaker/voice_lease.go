@@ -48,6 +48,12 @@ func leaseOperation(args []string, now time.Time) (any, error) {
 	if len(args) != 5 || (args[0] != "acquire" && args[0] != "renew") || (args[2] != "primary" && args[2] != "standby") || len(args[1]) < 1 || len(args[1]) > 100 {
 		return nil, errors.New("voice lease acquire|renew NODE primary|standby URL BACKEND; status|check NODE|release NODE")
 	}
+	configMu.RLock()
+	standbyDisabled := activeConfig.VoiceStandbyDisabled
+	configMu.RUnlock()
+	if args[2] == "standby" && standbyDisabled {
+		return map[string]any{"granted": false, "lease": voiceOwner, "standby_disabled": true}, nil
+	}
 	u, e := url.Parse(args[3])
 	if e != nil || u.Scheme != "http" || u.Hostname() == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || (u.Path != "" && u.Path != "/") || len(args[4]) > 80 {
 		return nil, errors.New("invalid voice endpoint")
