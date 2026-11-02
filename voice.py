@@ -262,6 +262,7 @@ class Engine:
             from voice_numbers import pronounce_numbers
             audio=self.speech.wav(pronounce_numbers(text),speaker=speaker)
             if not ALLOWED.is_set() or self.control.cancelled.is_set():return
+            if LEASE is not None and ctl("voice","lease","check",LEASE.node) is not True:return
             process=subprocess.Popen(ssh(shlex.join(["/usr/bin/aplay","-q","-D","default","-t","wav"])),stdin=subprocess.PIPE,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
             with self.play_lock:self.playback=process
             try:process.communicate(input=audio,timeout=25)

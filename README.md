@@ -114,6 +114,11 @@ docker compose run --rm --no-deps voice python setup-models.py
 docker compose --profile cpu up -d --build
 ```
 
+For a Pi sharing resources with other services, `.env` also accepts
+`WHISPER_THREADS=2`, `WHISPER_CPU_LIMIT=2`, `VOICE_CPU_LIMIT=2`, and
+`VOICE_MEMORY_LIMIT=2g`. These limit inference/voice load; they do not resolve
+an unstable power supply.
+
 The CPU image builds the same pinned source natively on ARM64 with CUDA and native
 CPU tuning disabled. It uses four threads and the same quantized model. The ARM64
 voice image uses Whisper.cpp; faster-whisper is omitted there. Do not select the

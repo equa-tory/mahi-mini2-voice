@@ -48,8 +48,8 @@ services:
     tmpfs: [/tmp:size=32m]
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
-    mem_limit: 3g
-    cpus: 4
+    mem_limit: ${VOICE_MEMORY_LIMIT:-3g}
+    cpus: ${VOICE_CPU_LIMIT:-4}
   whisper-gpu:
     <<: *whisper
     profiles: [gpu]
@@ -72,4 +72,5 @@ services:
       context: .
       dockerfile: WhisperCpp.Dockerfile
     mem_limit: 1g
-    cpus: 4
+    cpus: ${WHISPER_CPU_LIMIT:-4}
+    command: ["--host", "127.0.0.1", "--port", "8788", "--model", "/models/ggml-small-q5_1.bin", "--threads", "${WHISPER_THREADS:-4}", "--no-gpu", "--no-fallback", "--best-of", "1", "--beam-size", "1", "--language", "ru"]
