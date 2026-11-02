@@ -140,10 +140,10 @@ async function loadSpeaker(){
  const selected=$("faceSelect").value;$("faceSelect").replaceChildren(option("","New animation"));
  for(const [name,entries]of Object.entries(speakerConfig.faces||{}))if(entries.length<=2)$("faceSelect").append(option(name));
  $("faceSelect").value=selected;
- renderActions($("speakerActions"),speakerConfig.actions||{},"speaker");
+ $("speakerActions").replaceChildren();
  const raw=await api("/ui/speaker-config-yaml");$("speakerYaml").value=raw.yaml;
 }
-async function loadServerActions(){serverActions=(await api("/ui/actions")).actions;$("httpExisting").replaceChildren(option("","New action"),...Object.entries(serverActions).filter(([,a])=>a.type==="http").map(([name])=>option(name)));renderActions($("serverActions"),serverActions,"server");$("actionsYaml").value=(await api("/ui/actions-yaml")).yaml}
+async function loadServerActions(){serverActions=(await api("/ui/actions")).actions;$("httpExisting").replaceChildren(option("","New action"),...Object.entries(serverActions).filter(([,a])=>a.type==="http").map(([name])=>option(name)));$("serverActions").replaceChildren();$("actionsYaml").value=(await api("/ui/actions-yaml")).yaml}
 async function loadVoice(){
  voiceConfig=await api("/ui/voice-config");
  $("wakePhrase").value=voiceConfig.wake_word;document.querySelectorAll(".assistantName").forEach(el=>el.textContent=voiceConfig.wake_word);
@@ -227,17 +227,21 @@ let catalogEntries={};
 async function loadCatalog(){
  const data=await api("/ui/catalog");catalogEntries=data.entries;$("defaultDisplaySeconds").value=data.display_seconds||3;$("actionCatalog").replaceChildren();
  for(const [key,entry] of Object.entries(catalogEntries)){
-  const row=document.createElement("section");row.className="card";row.dataset.catalog=key;
-  const heading=document.createElement("h3");heading.textContent=key;row.append(heading);
+  const row=document.createElement("details");row.className="catalog-entry";row.dataset.catalog=key;
+  const heading=document.createElement("summary");heading.textContent=key;row.append(heading);
+  const [target,name]=[key.slice(0,key.indexOf(":")),key.slice(key.indexOf(":")+1)];
+  if(target==="server")for(const [argument,spec]of Object.entries(serverActions[name]?.arguments||{})){
+   const label=document.createElement("label");label.textContent=argument+(spec.required?" *":"");const input=spec.type==="enum"?choice(["",...spec.values],spec.default??""):document.createElement("input");input.dataset.argument=argument;if(spec.type!=="enum")input.value=spec.default??"";if(["number","duration"].includes(spec.type))input.type="number";label.append(input);row.append(label)
+  }
   const fields=[["phrases","Voice phrases",(entry.phrases||[]).join("\n")],["responses","Response variants",(entry.responses||[""]).join("\n")]];
   for(const [name,labelText,value] of fields){const label=document.createElement("label");label.textContent=labelText;const input=document.createElement("textarea");input.dataset.field=name;input.value=value;input.rows=3;label.append(input);row.append(label)}
   const label=document.createElement("label");label.textContent="Temporary display seconds (blank: use default)";const timeout=document.createElement("input");timeout.type="number";timeout.min=1;timeout.max=86400;timeout.dataset.field="display_seconds";timeout.value=entry.display_seconds??"";label.append(timeout);row.append(label);
-  const [target,name]=[key.slice(0,key.indexOf(":")),key.slice(key.indexOf(":")+1)];
-  if(target!=="feedback") {const run=document.createElement("button");run.textContent="Run";run.onclick=()=>busy(run,async()=>{
+
+  if(target!=="feedback") {const run=document.createElement("button");run.textContent="Run";run.onclick=event=>{event.preventDefault();event.stopPropagation();return busy(run,async()=>{
    if(target==="speaker")await command(["action","run",name]);
-   else if(target==="server") {const definition=serverActions[name]||{};const existing=[...$("serverActions").children].find(row=>row.dataset.name===name);await api("/run",{action:name,args:existing?readActionArgs(existing,definition):{}})}
+   else if(target==="server")await api("/run",{action:name,args:readActionArgs(row,serverActions[name]||{})})
    else {const args={timer_start:["timer","pick"],timer_cancel:["timer","cancel"],timer_status:["timer","status"],weather:["weather","show"],time:["clock","clear"],volume_down:["volume","down"],volume_up:["volume","up"]};await command(args[name])}
-   toast("Action requested")});row.append(run)}
+   toast("Action requested")})};heading.append(run)}
   const bound=Object.entries(speakerConfig.bindings||{}).filter(([,action])=>target==="speaker"&&action===name).map(([key])=>key);if(bound.length){const info=document.createElement("p");info.textContent="Buttons: "+bound.join(", ");row.append(info)}
   $("actionCatalog").append(row);
  }
@@ -245,4 +249,9 @@ async function loadCatalog(){
 bind("saveCatalog",async()=>{
  const entries={};for(const row of document.querySelectorAll("[data-catalog]")){const field=name=>row.querySelector(`[data-field="${name}"]`);entries[row.dataset.catalog]={phrases:field("phrases").value.split("\n").map(x=>x.trim()).filter(Boolean),responses:field("responses").value.split("\n"),display_seconds:field("display_seconds").value===""?null:Number(field("display_seconds").value)}}
  await api("/ui/catalog",{entries,display_seconds:Number($("defaultDisplaySeconds").value)});await loadCatalog();toast("Action catalog saved")
+});
+
+$("catalogSearch").addEventListener("input",event=>{
+ const query=event.target.value.trim().toLowerCase();
+ for(const row of document.querySelectorAll("[data-catalog]"))row.hidden=![row.dataset.catalog,...(catalogEntries[row.dataset.catalog]?.phrases||[])].join(" ").toLowerCase().includes(query);
 });
