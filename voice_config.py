@@ -42,6 +42,7 @@ def validate_voice(config):
     if not isinstance(config.get("auto_threshold",True),bool):raise ValueError("auto threshold must be true or false")
     if config.get("microphone_channel",0) not in (0,2,4,6):raise ValueError("invalid microphone channel")
     validate_templates(config.get("responses",{}))
+    validate_templates({"unknown":config.get("default_response","Готово.")})
     from action_catalog import validate_catalog
     validate_catalog(config.get("action_catalog",{}))
     if not isinstance(config.get("assistant_face","eyes"),str) or len(config.get("assistant_face","eyes"))>60:raise ValueError("invalid assistant face")

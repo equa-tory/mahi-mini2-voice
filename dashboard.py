@@ -40,7 +40,7 @@ def get(path,send,load_actions):
         from action_catalog import catalog
         with open(VOICE_PATH) as f: config=yaml.safe_load(f)
         speaker=yaml.safe_load(rpc(["config","effective"],send))
-        return {"entries":catalog(config,speaker.get("actions",{}),load_actions()),"display_seconds":speaker.get("display_seconds",3)}
+        return {"entries":catalog(config,speaker.get("actions",{}),load_actions()),"display_seconds":speaker.get("display_seconds",3),"default_response":config.get("default_response","Готово.")}
     if path=="/ui/recordings":return voice_request("record_list")
     if path=="/ui/listen-test":return voice_request("status")
     if path=="/ui/weather":
@@ -74,6 +74,8 @@ def post(path,data,send,validate_actions):
             with open(os.environ.get("ACTIONS_CONFIG","/config/actions.yaml")) as f: server=yaml.safe_load(f).get("actions",{})
             with open(VOICE_PATH) as f: current_voice=yaml.safe_load(f)
             entries=validate_catalog(data.get("entries"),server,current_voice.get("responses",{}).get("action"))
+            default_response=data.get("default_response",current_voice.get("default_response","Готово."))
+            validate_voice({**current_voice,"default_response":default_response})
             seconds=data.get("display_seconds",3)
             if isinstance(seconds,bool) or not isinstance(seconds,int) or not 1<=seconds<=86400:raise ValueError("invalid default display duration")
             speaker=yaml.safe_load(rpc(["config","effective"],send))
@@ -86,6 +88,7 @@ def post(path,data,send,validate_actions):
             rpc(["config","apply",yaml.safe_dump(speaker,sort_keys=False,allow_unicode=True)],send)
             with open(VOICE_PATH) as f: config=yaml.safe_load(f)
             config["action_catalog"]=entries
+            config["default_response"]=default_response
             validate_voice(config)
             write_in_place(VOICE_PATH,yaml.safe_dump(config,sort_keys=False,allow_unicode=True))
         return "Action phrases and responses saved"

@@ -225,7 +225,7 @@ $("httpExisting").addEventListener("change",()=>{const name=$("httpExisting").va
 
 let catalogEntries={};
 async function loadCatalog(){
- const data=await api("/ui/catalog");catalogEntries=data.entries;$("defaultDisplaySeconds").value=data.display_seconds||3;$("actionCatalog").replaceChildren();
+ const data=await api("/ui/catalog");catalogEntries=data.entries;$("defaultResponse").value=data.default_response??"Готово.";$("defaultDisplaySeconds").value=data.display_seconds||3;$("actionCatalog").replaceChildren();
  for(const [key,entry] of Object.entries(catalogEntries)){
   const row=document.createElement("details");row.className="catalog-entry";row.dataset.catalog=key;
   const heading=document.createElement("summary");heading.textContent=key;row.append(heading);
@@ -234,7 +234,7 @@ async function loadCatalog(){
    const label=document.createElement("label");label.textContent=argument+(spec.required?" *":"");const input=spec.type==="enum"?choice(["",...spec.values],spec.default??""):document.createElement("input");input.dataset.argument=argument;if(spec.type!=="enum")input.value=spec.default??"";if(["number","duration"].includes(spec.type))input.type="number";label.append(input);row.append(label)
   }
   const fields=[["phrases","Voice phrases",(entry.phrases||[]).join("\n")],["responses","Response variants",(entry.responses||[""]).join("\n")]];
-  for(const [name,labelText,value] of fields){const label=document.createElement("label");label.textContent=labelText;const input=document.createElement("textarea");input.dataset.field=name;input.value=value;input.rows=3;label.append(input);row.append(label)}
+  for(const [name,labelText,value] of fields){const label=document.createElement("label");label.textContent=labelText;const input=document.createElement("textarea");input.dataset.field=name;input.value=value;input.rows=3;if(name==="responses")input.placeholder="Use default response";label.append(input);row.append(label)}
   const label=document.createElement("label");label.textContent="Temporary display seconds (blank: use default)";const timeout=document.createElement("input");timeout.type="number";timeout.min=1;timeout.max=86400;timeout.dataset.field="display_seconds";timeout.value=entry.display_seconds??"";label.append(timeout);row.append(label);
 
   if(target!=="feedback") {const run=document.createElement("button");run.textContent="Run";run.onclick=event=>{event.preventDefault();event.stopPropagation();return busy(run,async()=>{
@@ -248,7 +248,7 @@ async function loadCatalog(){
 }
 bind("saveCatalog",async()=>{
  const entries={};for(const row of document.querySelectorAll("[data-catalog]")){const field=name=>row.querySelector(`[data-field="${name}"]`);entries[row.dataset.catalog]={phrases:field("phrases").value.split("\n").map(x=>x.trim()).filter(Boolean),responses:field("responses").value.split("\n"),display_seconds:field("display_seconds").value===""?null:Number(field("display_seconds").value)}}
- await api("/ui/catalog",{entries,display_seconds:Number($("defaultDisplaySeconds").value)});await loadCatalog();toast("Action catalog saved")
+ await api("/ui/catalog",{entries,default_response:$("defaultResponse").value,display_seconds:Number($("defaultDisplaySeconds").value)});await loadCatalog();toast("Action catalog saved")
 });
 
 $("catalogSearch").addEventListener("input",event=>{

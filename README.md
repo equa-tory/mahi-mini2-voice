@@ -78,7 +78,7 @@ The action catalog imports old `voice.yaml` aliases, intent triggers, and respon
 without changing legacy files merely by reading them. Save actions to persist the
 catalog. Built-ins, named speaker actions, named server actions, and feedback responses
 have stable names. Edit phrases and response variants one per line; one variant is
-chosen randomly per response. Blank responses mean silence. Placeholder validation,
+chosen randomly per response. Blank action response fields use the editable Default response at the top of the catalog, initially «Готово.». Placeholder validation,
 spoken numbers, argument extraction, result mappings, `/run`, and `mini2ctl action run`
 remain supported. Legacy fields are still accepted when no catalog override exists.
 

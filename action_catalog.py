@@ -6,6 +6,8 @@ from collections import defaultdict
 from voice_intents import DEFAULT_TRIGGERS
 from voice_config import DEFAULT_RESPONSES, validate_templates
 
+DEFAULT_ACTION_RESPONSE = "Готово."
+
 
 def catalog(config, speaker=None, server=None):
     entries = {}
@@ -15,10 +17,10 @@ def catalog(config, speaker=None, server=None):
                         'responses': [config.get('responses', {}).get(name, text)], 'display_seconds': None}
     for target, actions in (('speaker', speaker or {}), ('server', server or {})):
         for name in actions:
-            entries[target+':'+name] = {'phrases': [], 'responses': [config.get('responses', {}).get('action', DEFAULT_RESPONSES['action'])], 'display_seconds': None}
+            entries[target+':'+name] = {'phrases': [], 'responses': [config.get('responses', {}).get('action', '')], 'display_seconds': None}
     for phrase, name in config.get('aliases', {}).items():
         key = 'server:'+name
-        entries.setdefault(key, {'phrases': [], 'responses': [DEFAULT_RESPONSES['action']], 'display_seconds': None})['phrases'].append(phrase)
+        entries.setdefault(key, {'phrases': [], 'responses': [config.get('responses', {}).get('action', '')], 'display_seconds': None})['phrases'].append(phrase)
     entries.update(copy.deepcopy(config.get('action_catalog', {})))
     return entries
 
@@ -40,8 +42,8 @@ def validate_catalog(entries, server=None, legacy_response=None):
             raise ValueError('invalid action phrases')
         if target == 'feedback' and phrases:
             raise ValueError('feedback has no trigger')
-        if not isinstance(responses,list) or not 1<=len(responses)<=30:
-            raise ValueError('use 1..30 response lines')
+        if not isinstance(responses,list) or not 0<=len(responses)<=30:
+            raise ValueError('use at most 30 response lines')
         for response in responses:
             validate_templates({name if target in ('builtin','feedback') else 'action': response})
             if target in ('speaker','server') and server is not None:
@@ -77,6 +79,9 @@ def voice_routes(config):
 def response(config, name, **values):
     entries=config.get('action_catalog',{})
     key=name if ':' in name else ('builtin:' if name in DEFAULT_TRIGGERS else 'feedback:')+name
-    fallback=config.get('responses',{}).get(name,config.get('responses',{}).get('action',DEFAULT_RESPONSES['action']) if ':' in name else DEFAULT_RESPONSES[name])
+    fallback=config.get('responses',{}).get(name,config.get('responses',{}).get('action','') if ':' in name else DEFAULT_RESPONSES[name])
     lines=entries.get(key,{}).get('responses',[fallback])
-    return random.choice(lines).format_map(defaultdict(str,values))
+    selected=random.choice(lines or [''])
+    default=config.get("default_response",DEFAULT_ACTION_RESPONSE)
+    text=selected if selected.strip() else default if default.strip() else DEFAULT_ACTION_RESPONSE
+    return text.format_map(defaultdict(str,values))

@@ -41,3 +41,20 @@ class CatalogTests(unittest.TestCase):
         entries=catalog(old,{'face':{}},{'hello':{},'mapped':{}})
         validate_catalog(entries,{'hello':{},'mapped':{'results':{'state':'state'}}},legacy_response='{result_state}')
         with self.assertRaises(ValueError):validate_catalog(entries,{'hello':{},'mapped':{}})
+
+    def test_empty_response_uses_gotovo_default(self):
+        for lines in ([],[''],['   ']):
+            config={'action_catalog':{'speaker:face':{'responses':lines}}}
+            validate_catalog(config['action_catalog'])
+            self.assertEqual(response(config,'speaker:face'),'Готово.')
+        self.assertEqual(response({'responses':{'unknown':''}},'unknown'),'Готово.')
+        self.assertEqual(catalog({}, {}, {'new':{}})['server:new']['responses'],[''])
+
+    def test_global_default_response_is_editable(self):
+        config={'default_response':'Хорошо!','action_catalog':{'speaker:face':{'responses':['']}}}
+        self.assertEqual(response(config,'speaker:face'),'Хорошо!')
+        self.assertEqual(response({'default_response':'Хорошо!'},'server:new'),'Хорошо!')
+        config['default_response']=''
+        self.assertEqual(response(config,'speaker:face'),'Готово.')
+        from voice_config import validate_voice
+        with self.assertRaises(ValueError):validate_voice({'wake_word':'махи','default_response':'{duration}'})

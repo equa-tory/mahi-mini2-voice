@@ -13,7 +13,7 @@ class CustomizationTests(unittest.TestCase):
         for template in ('{duration.__class__}','{temperature}','{duration!r}','{duration:04}'):
             with self.assertRaises(ValueError):validate_templates({'timer_start':template})
         validate_templates({'action':'{result_temperature}','weather':'{city}: {temperature}'})
-        self.assertEqual(render_response({'responses':{'timer_start':''}},'timer_start',duration='две минуты'),'')
+        self.assertEqual(render_response({'responses':{'timer_start':''}},'timer_start',duration='две минуты'),'Готово.')
         self.assertIn('две минуты',render_response({},'timer_start',duration='две минуты'))
 
     def test_http_encoding_and_types(self):
