@@ -80,7 +80,7 @@ async function refreshTest(){
   const db=data.rms>0?20*Math.log10(data.rms/32768):-80;
   $("micMeter").style.width=Math.max(0,Math.min(100,(db+70)/70*100))+"%";
   $("micMeter").style.background=data.peak>32000?"#b83737":"var(--accent)";
-  $("micMetrics").textContent=`Input: ${Math.round(data.rms||0)} RMS · peak ${data.peak||0} · threshold ${data.effective_threshold||0} · recognition ${data.asr_ms||0} ms`+(data.peak>32000?" · clipping: lower sensitivity":"");
+  $("micMetrics").textContent=`Input: ${Math.round(data.rms||0)} RMS · peak ${data.peak||0} · threshold ${data.effective_threshold||0} · ${data.asr_backend||"recognition"} · ${data.asr_ms||0} ms`+(data.peak>32000?" · clipping: lower sensitivity":"");
   $("micMetrics").textContent+=` · speech ${data.speech_start_seconds??"—"}–${data.speech_end_seconds??"—"} s · capture ${data.capture_seconds??0} s · intent ${data.intent||"—"} · arguments ${JSON.stringify(data.arguments??null)}`;
   if(data.text&&data.text_at>lastHeardAt){$("heardText").value=data.text;lastHeardAt=data.text_at}
  }catch(error){$("micMetrics").textContent="Voice diagnostics unavailable: "+error.message}
@@ -89,7 +89,7 @@ async function stopTest(){await api("/ui/listen-test",{enabled:false});testing=f
 async function refreshVoice(){
  const data=await api("/voice/status");$("voicePhase").textContent=data.phase.replaceAll("_"," ");
  $("voiceSummary").textContent=`Wake detections: ${data.wake_count||0} · Requests: ${data.command_count||0}`;
- $("voiceDetail").textContent=`Status: ${data.phase.replaceAll("_"," ")}. Last command: ${data.last_intent||"none"}.`;
+ $("voiceDetail").textContent=`Status: ${data.phase.replaceAll("_"," ")}. Last command: ${data.last_intent||"none"}. Backend: ${data.asr_backend||"loading"}.`;
  $("voiceConfigError").textContent=data.config_error||data.error||"";
  const history=$("voiceHistory"),entries=JSON.stringify(data.history||[]);if(history.dataset.entries===entries)return;history.dataset.entries=entries;history.replaceChildren();
  if(!data.history?.length)history.textContent="No voice requests yet.";

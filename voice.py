@@ -226,6 +226,11 @@ def degrees(n):
     if 11<=value<=14:return "градусов"
     return "градус" if value%10==1 else "градуса" if value%10 in (2,3,4) else "градусов"
 
+def recognition_languages(language, testing=False):
+    if language == "auto":return [None]
+    if language == "ru-only":return ["ru"]
+    return [language] + (["en"] if language == "ru" and not testing else [])
+
 class Engine:
     def __init__(self,config):
         import onnxruntime
@@ -418,7 +423,7 @@ class Engine:
         peak=float(np.max(np.abs(samples))) if len(samples) else 0
         if peak>0:samples*=min(16,.8/peak)
         language=self.config.get("speech_language","ru")
-        candidates=[None] if language=="auto" else [language]+(["en"] if language=="ru" and not testing else [])
+        candidates=recognition_languages(language, testing)
         selected=("empty",None)
         started=time.monotonic()
         for candidate in candidates:
@@ -433,8 +438,11 @@ class Engine:
                 attempts.append({"text":raw_text[:2000], "language":candidate or "auto", "intent":result[0]})
                 voice_event(text=raw_text[:2000], command=text[:2000], intent=result[0], arguments=result[1], attempts=attempts[-4:], outcome="recognized")
             elapsed=round((time.monotonic()-started)*1000)
-            status(asr_ms=elapsed,asr_backend=LEASE.backend if LEASE else self.config.get("whisper_model","base"))
-            self.control.metrics(asr_ms=elapsed,capture_seconds=round(len(samples)/16000,1))
+            backend=getattr(self.asr,"backend",LEASE.backend if LEASE else self.config.get("whisper_model","base"))
+            if LEASE:LEASE.backend=backend
+            if not testing:voice_event(asr_backend=backend,asr_ms=elapsed)
+            status(asr_ms=elapsed,asr_backend=backend)
+            self.control.metrics(asr_ms=elapsed,asr_backend=backend,capture_seconds=round(len(samples)/16000,1))
             if testing:
                 self.control.transcript(raw_text)
                 self.control.metrics(intent=result[0],arguments=result[1])
@@ -451,6 +459,7 @@ class Engine:
         record_request_audio(audio)
         status(phase="thinking");indicate("thinking")
         language=self.config.get("speech_language","auto")
+        if language=="ru-only":language="ru"
         intent,value=self.decode(audio)
         if self.control.cancelled.is_set():return
         # The bounded dashboard history is explicitly enabled for recognition diagnosis.
@@ -517,7 +526,7 @@ class Engine:
                 started=time.monotonic()
                 model=load_asr(name)
                 loaded=time.monotonic()
-                segments,_=model.transcribe(samples,language=self.config.get("speech_language","ru") if self.config.get("speech_language","ru")!="auto" else None,beam_size=1,condition_on_previous_text=False)
+                segments,_=model.transcribe(samples,language=recognition_languages(self.config.get("speech_language","ru"), True)[0],beam_size=1,condition_on_previous_text=False)
                 text=" ".join(segment.text for segment in segments)
                 intent,args=classify(strip_wake(text,self.wake),*voice_routes(self.config))
                 results.append({"model":name,"text":text,"intent":intent,"arguments":args,"model_load_ms":round((loaded-started)*1000),"asr_ms":round((time.monotonic()-loaded)*1000),"capture_seconds":len(audio)/32000})

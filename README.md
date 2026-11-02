@@ -176,3 +176,38 @@ The Voice & phrases dashboard shows the recent wake/request interactions, includ
 To disable standby failover temporarily, set `voice_standby_disabled: true` in the speaker configuration (Buttons & actions → speaker YAML). The speaker rejects standby acquisitions and renewals while the primary continues normally. Set it to false to restore standby eligibility.
 
 The global voice `cancel` command uses the cancellation actions in the speaker’s center-tap priority list, without invoking playback fallback. The default order is timer cancellation, timer picker close, assistant stop, then local action cancellation. Explicit timer-cancel phrases remain supported.
+
+### Russian-only recognition and larger GPU models
+
+Choose **Russian only** under Voice & phrases to prevent English retries.
+Russian first retains the previous English fallback behavior. Both ASR backends
+keep their models loaded between requests; changing the CPU profile reloads it.
+
+To try Large-v3 Turbo on the P4, download `ggml-large-v3-turbo-q5_0.bin`
+from [the upstream model repository](https://huggingface.co/ggerganov/whisper.cpp)
+into `models/whisper-cpp/`, then set these in your private `.env`:
+
+```dotenv
+WHISPER_MODEL_FILE=ggml-large-v3-turbo-q5_0.bin
+WHISPER_BACKEND_NAME=whisper-cpp-large-v3-turbo-q5_0
+```
+
+Run `docker compose --profile gpu up -d whisper-gpu voice` and choose
+**Whisper.cpp · GPU with resident CPU fallback** in the dashboard. This replaces the
+GPU server's resident model; it does not download or reload a model per request.
+Remove those two settings and recreate the services to return to Small.
+The CPU standby profile continues to use Small.
+
+With the Whisper.cpp profile, a resident Small CPU model handles requests when
+the GPU service fails or times out (15 seconds). Every new request tries GPU
+again. This fallback applies to service failures, not unrecognized phrases;
+Russian-only mode remains Russian on both backends. The microphone metrics and
+request history report the backend that actually handled recognition.
+
+The CPU Base and CPU Small dashboard profiles remain selectable and keep their
+model loaded in system RAM. Selecting either runs recognition entirely on CPU.
+
+The built-in CPU fallback defaults on for amd64; ARM64 retains the external
+Whisper.cpp CPU service without requiring faster-whisper. Set
+`VOICE_CPU_FALLBACK=0` in the private environment to disable the additional
+resident fallback model.

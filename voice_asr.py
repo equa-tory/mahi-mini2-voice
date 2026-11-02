@@ -2,6 +2,7 @@
 import io
 import json
 import os
+import platform
 import urllib.request
 import uuid
 import wave
@@ -41,11 +42,35 @@ class WhisperCpp:
             headers={"Content-Type": f"multipart/form-data; boundary={boundary}"})
         # Never send microphone audio through an environment-configured proxy.
         opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
-        with opener.open(request, timeout=45) as response:
+        with opener.open(request, timeout=15) as response:
             result = json.load(response)
         if not isinstance(result.get("text"), str):
             raise ValueError("invalid whisper.cpp response")
         return [SimpleNamespace(text=result["text"])], None
+
+
+def cpu_fallback_enabled():
+    return os.environ.get("VOICE_CPU_FALLBACK", "1" if platform.machine() in ("x86_64", "AMD64") else "0") == "1"
+
+
+class ResilientWhisperCpp:
+    """Keep both models resident; retry the GPU on every new request."""
+    def __init__(self):
+        self.gpu = WhisperCpp()
+        self.cpu = load_asr("small")
+        self.backend = os.environ.get("VOICE_ASR_BACKEND", "whisper-cpp")
+
+    def transcribe(self, samples, **kwargs):
+        try:
+            result = self.gpu.transcribe(samples, **kwargs)
+            self.backend = os.environ.get("VOICE_ASR_BACKEND", "whisper-cpp")
+            return result
+        except (OSError, ValueError, TimeoutError):
+            # Materialize segments here: faster-whisper inference is lazy.
+            segments, info = self.cpu.transcribe(samples, **kwargs)
+            result = list(segments), info
+            self.backend = "faster-whisper-small-cpu-fallback"
+            return result
 
 
 def load_asr(name):
@@ -55,10 +80,10 @@ def load_asr(name):
         url = urlsplit(backend.url)
         if url.scheme != "http" or url.hostname not in ("127.0.0.1", "localhost", "::1"):
             raise ValueError("whisper.cpp must use a local HTTP endpoint")
+        if cpu_fallback_enabled():return ResilientWhisperCpp()
         opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
         with opener.open(f"http://{url.netloc}/health", timeout=3) as response:
-            if json.load(response).get("status") != "ok":
-                raise ValueError("whisper.cpp is not ready")
+            if json.load(response).get("status") != "ok":raise ValueError("whisper.cpp is not ready")
         return backend
     from faster_whisper import WhisperModel
     return WhisperModel(name, device="cpu", compute_type="int8", cpu_threads=4,

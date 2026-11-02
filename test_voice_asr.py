@@ -8,7 +8,7 @@ from email import policy
 from email.parser import BytesParser
 from unittest.mock import Mock, patch
 
-from voice_asr import WhisperCpp, load_asr
+from voice_asr import WhisperCpp, ResilientWhisperCpp, load_asr
 from voice_config import validate_voice
 
 
@@ -16,8 +16,8 @@ class BackendTests(unittest.TestCase):
     def test_local_readiness(self):
         opener = Mock()
         opener.open.return_value = io.BytesIO(b'{"status":"ok"}')
-        with patch("voice_asr.urllib.request.build_opener", return_value=opener):
-            self.assertIsInstance(load_asr("small-cpp"), WhisperCpp)
+        with patch("voice_asr.ResilientWhisperCpp") as factory:
+            self.assertIs(load_asr("small-cpp"), factory.return_value)
         with patch.dict("os.environ", {"WHISPER_CPP_URL": "http://example.org/inference"}):
             with self.assertRaises(ValueError):load_asr("small-cpp")
 
@@ -61,3 +61,26 @@ class BackendTests(unittest.TestCase):
         opener.open.side_effect = urllib.error.URLError("offline")
         with patch("voice_asr.urllib.request.build_opener", return_value=opener):
             with self.assertRaises(urllib.error.URLError):backend.transcribe(np.zeros(10))
+
+class LanguageTests(unittest.TestCase):
+    def test_russian_only_has_no_english_retry(self):
+        from voice import recognition_languages
+        for testing in (False, True):
+            self.assertEqual(recognition_languages("ru-only", testing), ["ru"])
+        self.assertEqual(recognition_languages("ru"), ["ru", "en"])
+        self.assertEqual(recognition_languages("auto"), [None])
+        validate_voice({"wake_word": "махи", "speech_language": "ru-only"})
+
+class FallbackTests(unittest.TestCase):
+    def test_service_failure_and_recovery(self):
+        backend=ResilientWhisperCpp.__new__(ResilientWhisperCpp)
+        backend.gpu=Mock();backend.cpu=Mock()
+        backend.gpu.transcribe.side_effect=OSError("offline")
+        backend.cpu.transcribe.return_value=(iter(["cpu"]),None)
+        self.assertEqual(backend.transcribe([],language="ru"),(["cpu"],None))
+        self.assertEqual(backend.backend,"faster-whisper-small-cpu-fallback")
+        backend.gpu.transcribe.side_effect=None
+        backend.gpu.transcribe.return_value=(["gpu"],None)
+        self.assertEqual(backend.transcribe([],language="ru"),(["gpu"],None))
+        self.assertNotIn("fallback",backend.backend)
+        self.assertEqual(backend.cpu.transcribe.call_count,1)

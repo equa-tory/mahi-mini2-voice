@@ -30,7 +30,7 @@ def validate_voice(config):
     if not isinstance(config,dict):raise ValueError("voice config must be an object")
     word=config.get("wake_word")
     if not isinstance(word,str) or not 1<=len(word)<=80 or not word.strip():raise ValueError("wake phrase required, max80 characters")
-    if config.get("speech_language","ru") not in ("ru","en","auto"):raise ValueError("language must be ru,en,auto")
+    if config.get("speech_language","ru") not in ("ru","ru-only","en","auto"):raise ValueError("language must be ru,ru-only,en,auto")
     if not 0<=float(config.get("tts_volume",.65))<=1:raise ValueError("speech volume must be 0..1")
     if config.get("tts_speaker","baya") not in ("aidar","baya","kseniya","xenia","eugene"):raise ValueError("unknown voice")
     if not 1<=int(config.get("wake_confirmations",2))<=5:raise ValueError("wake confirmations must be1..5")

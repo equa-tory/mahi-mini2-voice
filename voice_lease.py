@@ -22,7 +22,10 @@ class VoiceLease:
     def check_health(self):
         opener=urllib.request.build_opener(urllib.request.ProxyHandler({}))
         urls=[os.environ.get('AUTOMATION_URL','http://127.0.0.1:8787')+'/health']
-        if self.asr_model=='small-cpp':urls.append(os.environ.get('WHISPER_CPP_URL','http://127.0.0.1:8788/inference').rsplit('/',1)[0]+'/health')
+        # A resident CPU fallback keeps recognition available if the GPU fails.
+        from voice_asr import cpu_fallback_enabled
+        if self.asr_model=="small-cpp" and not cpu_fallback_enabled():
+            urls.append(os.environ.get("WHISPER_CPP_URL","http://127.0.0.1:8788/inference").rsplit("/",1)[0]+"/health")
         for url in urls:
             with opener.open(url,timeout=1) as response:
                 if response.status!=200: raise RuntimeError('voice backend unavailable')
