@@ -360,7 +360,8 @@ class Engine:
             if fresh.get("microphone_channel",0)!=self.config.get("microphone_channel",0):
                 stop_stream();clear_audio();self.preroll.clear();self.rec.Reset()
             self.config=fresh
-            if LEASE:LEASE.configure_model(fresh.get("whisper_model","base"));self.config_source=raw
+            if LEASE:LEASE.configure_model(fresh.get("whisper_model","base"))
+            self.config_source=raw
             status(config_error="",tts_speaker=fresh.get("tts_speaker","irina"),wake_word=self.wake)
         except Exception as error:
             status(config_error=str(error)[:160])
@@ -383,7 +384,7 @@ class Engine:
             if not testing:self.command_text=text
             result=classify(text,*voice_routes(self.config))
             elapsed=round((time.monotonic()-started)*1000)
-            status(asr_ms=elapsed,asr_backend=self.config.get("whisper_model","base"))
+            status(asr_ms=elapsed,asr_backend=LEASE.backend if LEASE else self.config.get("whisper_model","base"))
             self.control.metrics(asr_ms=elapsed,capture_seconds=round(len(samples)/16000,1))
             if testing:
                 self.control.transcript(raw_text)
