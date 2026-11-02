@@ -20,3 +20,11 @@ class VoiceLeaseTests(unittest.TestCase):
         self.assertEqual(calls[0][:3],('voice','lease','acquire'))
         self.assertEqual(calls[1][:3],('voice','lease','renew'))
         self.assertFalse(lease.owned)
+
+    def test_speaker_mutation_is_fenced_after_ownership_loss(self):
+        import voice
+        from types import SimpleNamespace
+        with patch.object(voice,'LEASE',SimpleNamespace(node='old-session')),patch.object(voice,'remote',return_value=b'{"ok":true,"data":false}') as remote:
+            with self.assertRaisesRegex(RuntimeError,'ownership expired'):voice.ctl('timer','start','120')
+            self.assertEqual(remote.call_count,1)
+            self.assertEqual(remote.call_args.args[0][-4:],['voice','lease','check','old-session'])

@@ -57,6 +57,10 @@ def remote(argv, data=None, timeout=5):
     return result.stdout
 
 def ctl(*args):
+    readonly=args==("status",) or len(args)>1 and args[1] in ("status","get","selection") or args[:2]==("voice","lease")
+    if LEASE is not None and not readonly:
+        fence=json.loads(remote(["/data/opt/bin/mini2ctl","voice","lease","check",LEASE.node]))
+        if fence.get("data") is not True:raise RuntimeError("voice ownership expired")
     response=json.loads(remote(["/data/opt/bin/mini2ctl",*args]))
     if not response.get("ok"):raise RuntimeError(response.get("error","speaker command failed"))
     return response.get("data")
@@ -168,6 +172,10 @@ def rms(audio):
     return math.sqrt(sum(x*x for x in values)/max(1,len(values)))
 
 def indicate(phase):
+    if LEASE is not None:
+        try:
+            if ctl("voice","lease","check",LEASE.node) is not True:return
+        except Exception:return
     try:
         if phase in ("listening","thinking","speaking"):
             from voice_config import read_voice
