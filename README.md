@@ -63,9 +63,9 @@ replace the binary, and start it using the speaker's existing local-ring init se
 new installation; existing controls and action names are retained.
 
 The dashboard's speaker configuration interface persists ordered conditional rules.
-On an existing configuration add `{when: local.active, action: local.cancel, consume: true}`
-after assistant, timer, and picker checks for `center.tap`. Existing explicitly configured
-rule order is respected. The normal binding runs when no active rule matches.
+Existing center-tap rules gain the local cancellation check once during migration.
+The `action_rules_version: 2` marker preserves subsequent edits, including removed rules.
+Existing rule order is respected. The normal binding runs when no active rule matches.
 
 In `/data/opt/local-mode/server.json`, configure `url` with the primary's LAN URL and
 `token` with the same `AUTOMATION_TOKEN` used on both hosts. The daemon uses the
@@ -162,4 +162,5 @@ verify that the Pi becomes the sole owner after expiry. Repeat with the primary 
 service stopped and with the host offline. Restore primary services, verify the 60-second
 recovery interval and non-overlapping ownership, and interrupt an active Pi request with
 center tap. Test rear mute and software mute while each host owns the lease. Compare
-recognition latency using the same non-private WAV input and model on both nodes.
+recognition latency using the same WAV input and model on both nodes with
+`python3 benchmark.py /path/to/sample.wav --language ru`.

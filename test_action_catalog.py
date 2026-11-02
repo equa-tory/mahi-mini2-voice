@@ -35,3 +35,9 @@ class CatalogTests(unittest.TestCase):
     def test_custom_duration_validation(self):
         for seconds in (0,-1,True,86401,'3'):
             with self.assertRaises(ValueError):validate_catalog({'speaker:face':{'responses':[''],'display_seconds':seconds}})
+
+    def test_legacy_global_result_mapping_remains_importable(self):
+        old={'responses':{'action':'{result_state}'}}
+        entries=catalog(old,{'face':{}},{'hello':{},'mapped':{}})
+        validate_catalog(entries,{'hello':{},'mapped':{'results':{'state':'state'}}},legacy_response='{result_state}')
+        with self.assertRaises(ValueError):validate_catalog(entries,{'hello':{},'mapped':{}})

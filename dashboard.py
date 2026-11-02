@@ -72,7 +72,8 @@ def post(path,data,send,validate_actions):
         from action_catalog import validate_catalog
         with LOCK:
             with open(os.environ.get("ACTIONS_CONFIG","/config/actions.yaml")) as f: server=yaml.safe_load(f).get("actions",{})
-            entries=validate_catalog(data.get("entries"),server)
+            with open(VOICE_PATH) as f: current_voice=yaml.safe_load(f)
+            entries=validate_catalog(data.get("entries"),server,current_voice.get("responses",{}).get("action"))
             seconds=data.get("display_seconds",3)
             if isinstance(seconds,bool) or not isinstance(seconds,int) or not 1<=seconds<=86400:raise ValueError("invalid default display duration")
             speaker=yaml.safe_load(rpc(["config","effective"],send))

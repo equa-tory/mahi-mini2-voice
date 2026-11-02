@@ -23,10 +23,11 @@ def catalog(config, speaker=None, server=None):
     return entries
 
 
-def validate_catalog(entries, server=None):
+def validate_catalog(entries, server=None, legacy_response=None):
     if not isinstance(entries, dict) or len(entries) > 500:
         raise ValueError('invalid action catalog')
     for key, entry in entries.items():
+        if not isinstance(key,str):raise ValueError("invalid catalog action")
         target, sep, name = key.partition(':')
         if not sep or target not in ('builtin', 'feedback', 'speaker', 'server') or not name or len(name)>80:
             raise ValueError('invalid catalog action')
@@ -46,6 +47,7 @@ def validate_catalog(entries, server=None):
             if target in ('speaker','server') and server is not None:
                 fields = {f[7:] for _,f,_,_ in string.Formatter().parse(response) if f and f.startswith('result_')}
                 available = set(server.get(name,{}).get('results',{})) if target=='server' else set()
+                if response==legacy_response:available|={field for action in server.values() for field in action.get('results',{})}
                 if fields-available: raise ValueError('response uses an unmapped action result')
         seconds=entry.get('display_seconds')
         if seconds is not None and (isinstance(seconds,bool) or not isinstance(seconds,int) or not 1<=seconds<=86400):

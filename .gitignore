@@ -4,8 +4,8 @@
 /actions.yaml
 /voice.yaml
 /weather.yaml
-/models/
-/secrets/
+/models
+/secrets
 /state/
 /recordings/
 /dist-output/
