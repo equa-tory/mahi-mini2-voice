@@ -128,10 +128,17 @@ def guard(control=None):
         STOP.wait(.5)
 
 CAPTURE_COMMAND = """set -eu
+exec 9>/tmp/mahi-voice-capture.lock
+/usr/bin/flock -n 9 || exit 1
 [ "$(cat /sys/class/gpio/gpio414/value)" = 1 ]
 [ "$(cat /data/opt/local-mode/mic-muted)" = 0 ]
 /data/opt/bin/mini2ctl voice lease check "$1" | /bin/grep -Eq '"data"[[:space:]]*:[[:space:]]*true'
-/usr/bin/arecord -q -D hw:0,1 -t raw -f S16_LE -r 16000 -c 8 &
+# Only the lease-owning lock holder may clean up orphaned capture children.
+for pid in $(pidof arecord 2>/dev/null || true); do
+ parent=$(sed -n 's/^PPid:[[:space:]]*//p' /proc/$pid/status 2>/dev/null || true)
+ [ "$parent" != 1 ] || kill "$pid" 2>/dev/null || true
+done
+/usr/bin/arecord -q -D hw:0,1 -t raw -f S16_LE -r 16000 -c 8 9>&- &
 rec=$!
 trap 'kill "$rec" 2>/dev/null || true' EXIT
 trap 'exit 0' HUP INT TERM
@@ -149,7 +156,7 @@ def read_microphone(settings,control):
     global STREAM
     while not STOP.is_set():
         if not ALLOWED.wait(.5):continue
-        process=subprocess.Popen(ssh("/usr/bin/flock -n /tmp/mahi-voice-capture.lock sh -c "+shlex.quote(CAPTURE_COMMAND)+" voice-capture "+shlex.quote(LEASE.node)),
+        process=subprocess.Popen(ssh("sh -c "+shlex.quote(CAPTURE_COMMAND)+" voice-capture "+shlex.quote(LEASE.node)),
             stdout=subprocess.PIPE,stderr=subprocess.DEVNULL)
         with STREAM_LOCK:STREAM=process
         warmup=20  # PDM capture startup has a large transient; discard two seconds.
