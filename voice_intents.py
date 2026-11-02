@@ -13,6 +13,7 @@ NUMBERS = {
     "seventeen":17,"eighteen":18,"nineteen":19,"twenty":20,"thirty":30,
     "forty":40,"fifty":50,"sixty":60,
 }
+HALVES = {"полтора", "полторы", "полторах"}
 UNIT = re.compile(r"^(секунд\w*|сек|seconds?|secs?|минут\w*|мин|minutes?|mins?|час\w*|hours?|hrs?)$")
 def normalize(text):
     text=re.sub(r"(?<=\d)(?=[а-яa-z])"," ",text.lower().replace("ё","е").replace("don't","dont"))
@@ -25,14 +26,19 @@ def duration_from_text(text):
         if not UNIT.match(word):
             continue
         values=[]
+        fraction = False
         for token in reversed(tokens[max(0,index-2):index]):
+            if token in HALVES:
+                if values or fraction: break
+                fraction = True
+                continue
             if token.isdigit():
-                if values: break
+                if values or fraction: break
                 values=[int(token)];break
             if token in NUMBERS:
                 values.insert(0,NUMBERS[token])
             else: break
-        if not values:
+        if not values and not fraction:
             if index>0 and tokens[index-1] in ("на","for"):
                 values=[1]
             else:
@@ -40,9 +46,9 @@ def duration_from_text(text):
         # Only tens+units is a valid two-word number.
         if len(values)==2 and not (values[0]>=20 and values[0]%10==0 and 0<values[1]<10):
             return None
-        number=sum(values)
+        number=sum(values) + (1.5 if fraction else 0)
         factor=3600 if word.startswith(("час","hour","hr")) else 60 if word.startswith(("мин","min")) else 1
-        total+=number*factor
+        total+=int(number*factor)
     return total if 1<=total<=5999 else None
 
 DEFAULT_TRIGGERS={
@@ -58,6 +64,10 @@ DEFAULT_TRIGGERS={
 def classify(text,aliases=None,triggers=None):
     text=normalize(text)
     if not text:return ("empty",None)
+    # Whisper occasionally substitutes the near-homophone "таймир" for "таймер".
+    # Correct this one high-confidence command noun without fuzzy-matching arbitrary actions.
+    tokens=text.split()
+    text=" ".join("таймер" if token=="таймир" else token for token in tokens)
     if set(text.split()) & {"не","not","dont"}:return ("unknown",None)
     matches=[]
     for phrase,action in (aliases or {}).items():

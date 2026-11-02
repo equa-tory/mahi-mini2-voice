@@ -11,6 +11,10 @@ class VoiceTests(unittest.TestCase):
             ("set a timer for two minutes",120),
             ("set a timer for twenty five seconds",25),
             ("таймер на минуту",60),
+            ("таймер полторы минуты",90),
+            ("поставь таймер на полторы минуты",90),
+            ("таймер полтора часа",5400),
+            ("таймир на минуту",60),
             ("засеки две минуты",120),
         ]:
             self.assertEqual(classify(text),("timer_start",expected))
