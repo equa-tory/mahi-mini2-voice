@@ -13,6 +13,7 @@ class VoiceLease:
         self.backend=os.environ.get('VOICE_ASR_BACKEND','whisper-cpp')
         self.health=health or self.check_health
         self.owned=False
+        self.healthy=False
 
     def check_health(self):
         opener=urllib.request.build_opener(urllib.request.ProxyHandler({}))
@@ -25,10 +26,12 @@ class VoiceLease:
         if not self.url: raise RuntimeError('VOICE_PUBLIC_URL must identify this node')
         try:
             self.health()
+            self.healthy=True
             reply=self.ctl('voice','lease','renew' if self.owned else 'acquire',self.node,self.role,self.url,self.backend)
             self.owned=reply['granted']
             return self.owned
         except Exception:
+            self.healthy=False
             self.owned=False
             return False
 

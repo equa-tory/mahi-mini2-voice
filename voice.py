@@ -103,7 +103,7 @@ def guard(control=None):
                 if control.interrupt_callback:control.interrupt_callback()
             stop_stream()
             clear_audio()
-            status(phase="muted_or_disconnected",listening_enabled=False)
+            status(phase="standby" if LEASE and LEASE.healthy and not LEASE.owned else "muted_or_disconnected",listening_enabled=False)
         STOP.wait(.5)
 
 CAPTURE_COMMAND = """set -eu

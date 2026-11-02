@@ -9,4 +9,4 @@ RUN apt-get update && apt-get install -y --no-install-recommends libgomp1 libstd
 COPY --from=build /src/build/bin/whisper-server /usr/local/bin/whisper-server
 USER 1000:1000
 ENTRYPOINT ["whisper-server"]
-CMD ["--host", "127.0.0.1", "--port", "8788", "--model", "/models/ggml-small-q5_1.bin", "--threads", "4", "--no-fallback", "--best-of", "1", "--beam-size", "1", "--language", "ru"]
+CMD ["--host", "127.0.0.1", "--port", "8788", "--model", "/models/ggml-small-q5_1.bin", "--threads", "4", "--no-flash-attn", "--no-fallback", "--best-of", "1", "--beam-size", "1", "--language", "ru"]
