@@ -442,11 +442,28 @@ class Engine:
             result=classify(text,*voice_routes(self.config))
             from voice_asr import hallucinated_transcript
             if hallucinated_transcript(raw_text):result=("ignored",None)
+            attempts=[]
+            attempts.append({"text":raw_text[:2000],"language":candidate or "auto","intent":result[0],"pass":1})
+            # Default decoding is fast. Retry only a failed or incomplete command with
+            # a constrained Russian command vocabulary; never retry known hallucinations.
+            if result[0] in ("unknown","clarify_timer"):
+                try:
+                    retry_segments,_=self.asr.transcribe(samples,language=candidate,beam_size=5,
+                        initial_prompt="Махи. Таймер на одну минуту. Таймер на полторы минуты. Погода. Который час. Стоп.",
+                        condition_on_previous_text=False,vad_filter=False)
+                    retry_raw=" ".join(segment.text for segment in retry_segments)
+                    retry_text=strip_wake(retry_raw,self.wake)
+                    retry_result=classify(retry_text,*voice_routes(self.config))
+                    if hallucinated_transcript(retry_raw):retry_result=("ignored",None)
+                    attempts.append({"text":retry_raw[:2000],"language":candidate or "auto","intent":retry_result[0],"pass":2,"beam_size":5})
+                    if retry_result[0] not in ("unknown","empty","clarify_timer","ignored"):
+                        raw_text,text,result=retry_raw,retry_text,retry_result
+                except Exception as error:
+                    attempts.append({"pass":2,"error":str(error)[:200]})
             if not testing:
                 self.command_text=text
-                attempts=list(STATE.get("history", [{}])[0].get("attempts", []))
-                attempts.append({"text":raw_text[:2000], "language":candidate or "auto", "intent":result[0]})
-                voice_event(text=raw_text[:2000], command=text[:2000], intent=result[0], arguments=result[1], attempts=attempts[-4:], outcome="recognized")
+                previous=list(STATE.get("history", [{}])[0].get("attempts", []))
+                voice_event(text=raw_text[:2000], command=text[:2000], intent=result[0], arguments=result[1], attempts=(previous+attempts)[-4:], outcome="recognized")
             elapsed=round((time.monotonic()-started)*1000)
             backend=getattr(self.asr,"backend",LEASE.backend if LEASE else self.config.get("whisper_model","base"))
             if LEASE:LEASE.backend=backend

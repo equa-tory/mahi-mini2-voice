@@ -44,7 +44,8 @@ class BackendTests(unittest.TestCase):
         opener = Mock()
         opener.open.return_value = io.BytesIO(json.dumps({"text": "две минуты"}).encode())
         with patch("voice_asr.urllib.request.build_opener", return_value=opener):
-            segments, _ = backend.transcribe(np.array([0., .5, -2.]), language="ru")
+            segments, _ = backend.transcribe(np.array([0., .5, -2.]), language="ru", beam_size=5,
+                                             initial_prompt="Махи. Таймер на одну минуту.")
         self.assertEqual(segments[0].text, "две минуты")
         request = opener.open.call_args.args[0]
         message = BytesParser(policy=policy.default).parsebytes(
@@ -53,6 +54,8 @@ class BackendTests(unittest.TestCase):
                   for p in message.iter_parts()}
         self.assertEqual(fields["language"], b"ru")
         self.assertEqual(fields["temperature_inc"], b"0")
+        self.assertEqual(fields["beam_size"], b"5")
+        self.assertEqual(fields["prompt"], "Махи. Таймер на одну минуту.".encode())
         with wave.open(io.BytesIO(fields["file"]), "rb") as audio:
             self.assertEqual((audio.getnchannels(), audio.getsampwidth(), audio.getframerate(), audio.getnframes()), (1, 2, 16000, 3))
         opener.open.return_value = io.BytesIO(b'{"error":"failed"}')
@@ -61,6 +64,38 @@ class BackendTests(unittest.TestCase):
         opener.open.side_effect = urllib.error.URLError("offline")
         with patch("voice_asr.urllib.request.build_opener", return_value=opener):
             with self.assertRaises(urllib.error.URLError):backend.transcribe(np.zeros(10))
+
+    @unittest.skipUnless(importlib.util.find_spec("numpy"), "run in voice image")
+    def test_unclear_command_gets_one_prompted_retry(self):
+        from types import SimpleNamespace
+        import voice
+        import numpy as np
+        engine=voice.Engine.__new__(voice.Engine)
+        engine.config={"speech_language":"ru-only"};engine.wake="махи"
+        engine.control=Mock()
+        engine.asr=Mock()
+        engine.asr.transcribe.side_effect=[
+            ([SimpleNamespace(text=" какой-то шум")],None),
+            ([SimpleNamespace(text=" таймер на одну минуту")],None)]
+        with patch.object(voice,"status"), patch.object(voice,"voice_event") as event, patch.object(voice,"LEASE",None):
+            self.assertEqual(engine.decode(np.zeros(16000,dtype=np.int16).tobytes()),("timer_start",60))
+        self.assertEqual(engine.asr.transcribe.call_count,2)
+        self.assertEqual(engine.asr.transcribe.call_args.kwargs["beam_size"],5)
+        self.assertTrue(engine.asr.transcribe.call_args.kwargs["initial_prompt"])
+        self.assertEqual(event.call_args_list[0].kwargs["command"],"таймер на одну минуту")
+
+    @unittest.skipUnless(importlib.util.find_spec("numpy"), "run in voice image")
+    def test_known_hallucination_does_not_get_retried(self):
+        from types import SimpleNamespace
+        import voice
+        import numpy as np
+        engine=voice.Engine.__new__(voice.Engine)
+        engine.config={"speech_language":"ru-only"};engine.wake="махи"
+        engine.control=Mock();engine.asr=Mock()
+        engine.asr.transcribe.return_value=([SimpleNamespace(text=" Продолжение следует...")],None)
+        with patch.object(voice,"status"), patch.object(voice,"voice_event"), patch.object(voice,"LEASE",None):
+            self.assertEqual(engine.decode(np.zeros(16000,dtype=np.int16).tobytes()),("ignored",None))
+        self.assertEqual(engine.asr.transcribe.call_count,1)
 
 class LanguageTests(unittest.TestCase):
     def test_russian_only_has_no_english_retry(self):

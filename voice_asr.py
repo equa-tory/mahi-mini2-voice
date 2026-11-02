@@ -17,7 +17,7 @@ class WhisperCpp:
         self.model_ready = False
         self.url = os.environ.get("WHISPER_CPP_URL", "http://127.0.0.1:8788/inference")
 
-    def transcribe(self, samples, language=None, **_):
+    def transcribe(self, samples, language=None, beam_size=1, initial_prompt=None, **_):
         import numpy as np
         pcm = (np.clip(samples, -1, 1) * 32767).astype("<i2").tobytes()
         audio = io.BytesIO()
@@ -38,7 +38,9 @@ class WhisperCpp:
         fields = {"language": language or "auto", "response_format": "json",
                   "suppress_non_speech": "true",
                   "temperature": "0", "temperature_inc": "0", "best_of": "1",
-                  "beam_size": "1"}
+                  "beam_size": str(max(1, min(5, int(beam_size))))}
+        if initial_prompt:
+            fields["prompt"] = initial_prompt[:400]
         context = int(os.environ.get("WHISPER_CPP_AUDIO_CONTEXT", "0"))
         if context:
             if not 256 <= context <= 1500:

@@ -68,3 +68,21 @@ Recent voice diagnostics and cancellation update: 58 Python tests pass (two opti
 - Pre-wake buffer extended from one to three seconds to preserve fast commands.
   Quiet subtitle hallucination recordings still cannot be recovered reliably;
   raw text/audio remain visible and the result is explicitly ignored.
+
+## Targeted retry for unclear voice commands
+
+- Recent history showed nine wake requests and only one matched weather; the
+  others had unusable transcripts and were silent because unknown responses are
+  configured empty.
+- Repeating identical Turbo decoding five times kept the same invented subtitle
+  phrase. A beam-width-five retry with a short Russian command prompt recovered
+  “таймер на одну минуту” from one unclear saved request.
+- The voice worker now retries only `unknown` or `clarify_timer` results, retains
+  both transcripts in request history, and does not retry known hallucinations.
+  This adds a second inference only to unclear requests.
+- Turbo is still resident on the P4. The latest microphone metrics showed raw
+  RMS 1.4 and amplified peak 64/32767, indicating a very low input signal; the
+  existing gain is already at its maximum of 16. Check microphone channel and
+  physical input level if the targeted retry still misses commands.
+- 66 Python tests pass; four optional NumPy tests skip on the host and all 12
+  Whisper/backend tests pass inside the voice image.
