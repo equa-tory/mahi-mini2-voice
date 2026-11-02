@@ -5,20 +5,25 @@ import urllib.request
 import uuid
 
 class VoiceLease:
-    def __init__(self, ctl, health=None):
+    def __init__(self, ctl, health=None, model="small-cpp"):
         self.ctl=ctl
         self.node=os.environ.get('VOICE_NODE','primary')+'-'+uuid.uuid4().hex
         self.role=os.environ.get('VOICE_ROLE','primary')
         self.url=os.environ.get('VOICE_PUBLIC_URL','')
-        self.backend=os.environ.get('VOICE_ASR_BACKEND','whisper-cpp')
+        self.configure_model(model)
         self.health=health or self.check_health
         self.owned=False
         self.healthy=False
 
+    def configure_model(self, model):
+        self.asr_model=model
+        self.backend=os.environ.get('VOICE_ASR_BACKEND','whisper-cpp') if model=='small-cpp' else 'faster-whisper-'+model+'-cpu'
+
     def check_health(self):
         opener=urllib.request.build_opener(urllib.request.ProxyHandler({}))
-        for url in (os.environ.get('AUTOMATION_URL','http://127.0.0.1:8787')+'/health',
-                    os.environ.get('WHISPER_CPP_URL','http://127.0.0.1:8788/inference').rsplit('/',1)[0]+'/health'):
+        urls=[os.environ.get('AUTOMATION_URL','http://127.0.0.1:8787')+'/health']
+        if self.asr_model=='small-cpp':urls.append(os.environ.get('WHISPER_CPP_URL','http://127.0.0.1:8788/inference').rsplit('/',1)[0]+'/health')
+        for url in urls:
             with opener.open(url,timeout=1) as response:
                 if response.status!=200: raise RuntimeError('voice backend unavailable')
 

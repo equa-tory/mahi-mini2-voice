@@ -88,7 +88,7 @@ def guard(control=None):
     while not STOP.is_set():
         try:
             allowed=LEASE is not None and LEASE.renew() and privacy_allowed(ctl("status"))
-            status(voice_owner=ctl("voice","lease","status"),asr_backend=os.environ.get("VOICE_ASR_BACKEND","whisper-cpp"))
+            status(voice_owner=ctl("voice","lease","status"),asr_backend=LEASE.backend)
         except Exception:
             allowed=False
         if allowed:
@@ -198,7 +198,7 @@ class Engine:
         from voice_asr import load_asr
         from voice_tts import Speech
         global LEASE
-        LEASE=VoiceLease(ctl)
+        LEASE=VoiceLease(ctl,model=config.get("whisper_model","base"))
         self.config=config
         self.control=VoiceControl()
         self.play_lock=threading.Lock()
@@ -296,7 +296,7 @@ class Engine:
             seconds=self.config.get("action_catalog",{}).get("builtin:weather",{}).get("display_seconds")
             self.presentation_after_reply=("weather","show",*([str(seconds)] if seconds else []))
             temperature=round(data["temperature_c"])
-            return self.response("weather",temperature=number(temperature),degrees=degrees(temperature),city=data.get("city","Подольске"))
+            return self.response("weather",temperature=number(temperature),degrees=degrees(temperature),city=data.get("city",data.get("location","вашем городе")))
         if intent=="time":
             now=datetime.now(ZoneInfo("Europe/Moscow"))
             seconds=self.config.get("action_catalog",{}).get("builtin:time",{}).get("display_seconds")
@@ -359,7 +359,8 @@ class Engine:
                 self.wake=word
             if fresh.get("microphone_channel",0)!=self.config.get("microphone_channel",0):
                 stop_stream();clear_audio();self.preroll.clear();self.rec.Reset()
-            self.config=fresh;self.config_source=raw
+            self.config=fresh
+            if LEASE:LEASE.configure_model(fresh.get("whisper_model","base"));self.config_source=raw
             status(config_error="",tts_speaker=fresh.get("tts_speaker","irina"),wake_word=self.wake)
         except Exception as error:
             status(config_error=str(error)[:160])

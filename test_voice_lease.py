@@ -39,3 +39,11 @@ class VoiceLeaseTests(unittest.TestCase):
         with patch.object(voice.ALLOWED,'is_set',return_value=True),patch.object(voice,'ctl',side_effect=ctl):
             self.assertIn('минус два',engine.perform('weather',None))
             self.assertEqual(engine.presentation_after_reply,('weather','show','7'))
+
+    def test_legacy_asr_profiles_do_not_require_whisper_cpp(self):
+        with patch.dict('os.environ',{'VOICE_PUBLIC_URL':'http://127.0.0.1:8787'}):lease=VoiceLease(lambda *args:None,model='base')
+        with patch('voice_lease.urllib.request.build_opener') as opener:
+            opener.return_value.open.return_value.__enter__.return_value.status=200
+            lease.check_health()
+            self.assertEqual(opener.return_value.open.call_count,1)
+            self.assertEqual(lease.backend,'faster-whisper-base-cpu')
