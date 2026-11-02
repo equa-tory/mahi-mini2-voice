@@ -25,6 +25,9 @@
 - Live Pi ownership, interruption through the speaker's active-owner URL, and automatic
   recovery to the primary after the stability interval passed. Software microphone
   mute disabled listening on both nodes and the original setting was restored.
+- Runner unavailable, Whisper unavailable, and primary-worker freeze tests all passed:
+  Pi takeover took 8.2, 9.2 and 9.1 seconds respectively; primary recovery took about
+  71 seconds after health was restored. Speaker capture count stayed at most one.
 - Manual snapshot export, private copy and import on the Pi succeeded; it keeps its
   local copy rather than depending on the primary for configuration reads.
 - Tracked source and the complete public history were audited for private keys,
