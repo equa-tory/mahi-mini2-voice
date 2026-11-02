@@ -1,0 +1,73 @@
+#!/bin/sh
+# Brief volume number on Mini 2 clock; no audio writes and no flash log.
+set -u
+LED_ROOT=/sys/class/leds
+work=$(mktemp -d /tmp/mini2-volume-display.XXXXXX) || exit 1
+active=0
+snapshot() {
+ for f in "$LED_ROOT"/mini2:white:clock*/brightness; do
+  [ -r "$f" ] || continue
+  printf '%s %s\n' "$f" "$(cat "$f")"
+ done
+}
+restore() {
+ [ "$active" = 1 ] || return 0
+ snapshot > "$work/current"
+ # Yield if the firmware has already replaced our frame.
+ if cmp -s "$work/current" "$work/expected"; then
+  while read -r file value; do printf '%s\n' "$value" > "$file"; done < "$work/original"
+ fi
+ active=0
+ rm -f /tmp/mini2-volume-overlay
+}
+cleanup() { restore; rm -rf "$work"; }
+trap cleanup EXIT
+trap 'exit 0' INT TERM HUP
+show() {
+ [ ! -f /tmp/mini2-action-overlay ] || return 0
+ if [ "$active" = 0 ]; then
+  snapshot > "$work/original"
+  level=$(awk 'BEGIN{m=0} $2>m{m=$2} END{print m}' "$work/original")
+  # Respect a clock that the owner has disabled.
+  [ "$level" -gt 0 ] || return 0
+  [ "$level" -le 80 ] || level=80
+ fi
+ touch /tmp/mini2-volume-overlay
+ for f in "$LED_ROOT"/mini2:white:clock*/brightness; do printf '0\n' > "$f"; done
+ text=$(printf '%4d' "$1")
+ for pos in 1 2 3 4; do
+  digit=$(printf '%s' "$text" | cut -c "$pos")
+  case "$digit" in
+   0) segments=ABCDEF;; 1) segments=BC;; 2) segments=ABDEG;;
+   3) segments=ABCDG;; 4) segments=BCFG;; 5) segments=ACDFG;;
+   6) segments=ACDEFG;; 7) segments=ABC;; 8) segments=ABCDEFG;;
+   9) segments=ABCDFG;; *) segments=;;
+  esac
+  for segment in A B C D E F G; do
+   case "$segments" in *"$segment"*) printf '%s\n' "$level" > "$LED_ROOT/mini2:white:clock$segment$pos/brightness";; esac
+  done
+ done
+ snapshot > "$work/expected"
+ active=1
+ deadline=$(( $(date +%s) + 2 ))
+}
+volume() {
+ /usr/bin/amixer sget Master 2>/dev/null | sed -n 's/.*\[\([0-9][0-9]*\)%\].*/\1/p' | head -n 1
+}
+if [ "${1:-}" = --show ]; then
+ case "${2:-}" in ''|*[!0-9]*) exit 2;; esac
+ [ "$2" -le 100 ] || exit 2
+ case "${3:-2}" in ''|*[!0-9]*) exit 2;; esac
+ [ "${3:-2}" -ge 1 ] && [ "${3:-2}" -le 15 ] || exit 2
+ show "$2"; sleep "${3:-2}"; exit 0
+fi
+last=$(volume)
+while :; do
+ if [ "$(cat /data/opt/local-mode/default 2>/dev/null)" = local ]; then sleep 1; continue; fi
+ current=$(volume)
+ case "$current" in ''|*[!0-9]*) ;; *)
+  if [ "$current" != "$last" ]; then show "$current"; last=$current; fi
+ esac
+ if [ "$active" = 1 ] && [ "$(date +%s)" -ge "$deadline" ]; then restore; fi
+ sleep 0.5
+done

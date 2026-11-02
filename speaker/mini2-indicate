@@ -1,0 +1,12 @@
+#!/bin/sh
+set -eu
+case "${1:-}" in
+ idle) rm -f /tmp/mini2-indication; exit 0;;
+ listening|thinking|speaking|success|error) ;;
+ *) echo 'Usage: mini2-indicate listening|thinking|speaking|success|error [seconds:1..30] | idle' >&2; exit 2;;
+esac
+seconds=${2:-5}
+case "$seconds" in ''|*[!0-9]*) exit 2;; esac
+[ "$seconds" -ge 1 ] && [ "$seconds" -le 30 ] || exit 2
+printf '%s %s\n' "$1" "$(( $(date +%s) + seconds ))" > /tmp/mini2-indication.$$
+mv /tmp/mini2-indication.$$ /tmp/mini2-indication

@@ -1,0 +1,8 @@
+#!/bin/sh
+if [ "$1" = start ] && [ "$(cat /data/opt/local-mode/default 2>/dev/null)" = local ]; then
+ /data/opt/bin/mini2-mic restore
+ volume=$(cat /data/opt/local-mode/boot-volume 2>/dev/null || echo 30)
+ case "$volume" in ''|*[!0-9]*) volume=30;; esac
+ [ "$volume" -le 100 ] || volume=30
+ /usr/bin/amixer -q sset Master "$volume%"
+fi

@@ -1,0 +1,16 @@
+wake_word: махи
+wake_confirmations: 2
+microphone_channel: 0
+whisper_model: small-cpp
+speech_language: ru
+tts_model: ru_RU-irina-medium
+tts_engine: silero
+tts_speaker: baya
+tts_volume: 0.65
+microphone_gain: 4
+speech_threshold: 80
+silence_seconds: 0.65
+max_listen_seconds: 8
+auto_threshold: true
+assistant_face: eyes
+aliases: {}

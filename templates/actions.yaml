@@ -1,0 +1,10 @@
+version: 1
+actions:
+  hello:
+    type: speaker
+    args: [clock, text, HELO]
+  weather_refresh:
+    type: weather.refresh
+  weather_show:
+    type: speaker
+    args: [weather, show]

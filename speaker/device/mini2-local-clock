@@ -1,0 +1,26 @@
+#!/bin/sh
+last=
+root=/sys/class/leds
+while :; do
+ if [ "$(cat /data/opt/local-mode/default 2>/dev/null)" = local ]; then sleep 1; continue; fi
+ if [ ! -f /tmp/mini2-volume-overlay ] && [ ! -f /tmp/mini2-action-overlay ]; then
+  text=$(TZ=MSK-3 date +%H%M)
+  level=$(cat /tmp/mini2-effective-brightness 2>/dev/null || cat /data/opt/local-mode/clock-brightness)
+  if [ "$text:$level" != "$last" ]; then
+   for f in "$root"/mini2:white:clock*/brightness; do echo 0 > "$f"; done
+   for pos in 1 2 3 4; do
+    digit=$(echo "$text" | cut -c "$pos")
+    case "$digit" in
+     0) segments=ABCDEF;; 1) segments=BC;; 2) segments=ABDEG;; 3) segments=ABCDG;;
+     4) segments=BCFG;; 5) segments=ACDFG;; 6) segments=ACDEFG;;
+     7) segments=ABC;; 8) segments=ABCDEFG;; 9) segments=ABCDFG;;
+    esac
+    for seg in A B C D E F G; do
+     case "$segments" in *"$seg"*) echo "$level" > "$root/mini2:white:clock$seg$pos/brightness";; esac
+    done
+   done
+   last=$text:$level
+  fi
+ fi
+ sleep 1
+done

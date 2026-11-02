@@ -1,0 +1,2 @@
+#!/bin/sh
+exec /data/opt/bin/mini2-controls

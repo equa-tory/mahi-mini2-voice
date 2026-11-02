@@ -1,0 +1,38 @@
+"""Speaker is the authority. Any failed health/renewal stops local capture."""
+import os
+import time
+import urllib.request
+import uuid
+
+class VoiceLease:
+    def __init__(self, ctl, health=None):
+        self.ctl=ctl
+        self.node=os.environ.get('VOICE_NODE','primary')+'-'+uuid.uuid4().hex
+        self.role=os.environ.get('VOICE_ROLE','primary')
+        self.url=os.environ.get('VOICE_PUBLIC_URL','')
+        self.backend=os.environ.get('VOICE_ASR_BACKEND','whisper-cpp')
+        self.health=health or self.check_health
+        self.owned=False
+
+    def check_health(self):
+        opener=urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        for url in (os.environ.get('AUTOMATION_URL','http://127.0.0.1:8787')+'/health',
+                    os.environ.get('WHISPER_CPP_URL','http://127.0.0.1:8788/inference').rsplit('/',1)[0]+'/health'):
+            with opener.open(url,timeout=1) as response:
+                if response.status!=200: raise RuntimeError('voice backend unavailable')
+
+    def renew(self):
+        if not self.url: raise RuntimeError('VOICE_PUBLIC_URL must identify this node')
+        try:
+            self.health()
+            reply=self.ctl('voice','lease','renew' if self.owned else 'acquire',self.node,self.role,self.url,self.backend)
+            self.owned=reply['granted']
+            return self.owned
+        except Exception:
+            self.owned=False
+            return False
+
+    def release(self):
+        self.owned=False
+        try:self.ctl('voice','lease','release',self.node)
+        except Exception:pass

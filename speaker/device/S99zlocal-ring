@@ -1,0 +1,32 @@
+#!/bin/sh
+PID=/tmp/mini2-local-ring.pid
+alive() {
+ [ -r "$PID" ] || return 1
+ p=$(cat "$PID")
+ case "$p" in ''|*[!0-9]*) return 1;; esac
+ kill -0 "$p" 2>/dev/null && grep -Eq 'mini2-controls|mini2-local-ring' /proc/$p/cmdline 2>/dev/null
+}
+case "${1:-start}" in
+ start)
+  if ! alive; then
+   rm -f /tmp/mini2-controls.sock
+   setsid /data/opt/bin/mini2-local-ring </dev/null >/tmp/mini2-local-ring.log 2>&1 &
+   echo $! > "$PID"
+  fi
+  for n in $(seq 1 150); do
+   sleep 0.1
+   if [ -S /tmp/mini2-controls.sock ] && alive; then exit 0; fi
+   if ! alive; then cat /tmp/mini2-local-ring.log >&2; exit 1; fi
+  done
+  echo 'mini2-controls did not become ready within 15 seconds' >&2
+  exit 1;;
+ stop)
+  if alive; then
+   kill "$p"
+   for n in $(seq 1 200); do kill -0 "$p" 2>/dev/null || break; sleep 0.1; done
+   if kill -0 "$p" 2>/dev/null; then echo 'mini2-controls is still stopping' >&2; exit 1; fi
+  fi
+  rm -f "$PID" /tmp/mini2-controls.sock;;
+ restart) "$0" stop && "$0" start;;
+ *) echo 'Usage: S99zlocal-ring start|stop|restart' >&2; exit 2;;
+esac

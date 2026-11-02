@@ -1,0 +1,45 @@
+#!/bin/sh
+set -eu
+raw=0
+if [ "${1:-}" = --raw ]; then raw=1; shift; fi
+if [ "$raw" = 0 ] && [ -S /tmp/mini2-controls.sock ]; then
+ case "${1:-status}" in status|mute|unmute|toggle|restore) exec /data/opt/bin/mini2ctl mute "${1:-status}";; esac
+fi
+D=/data/opt/local-mode
+[ "$(cat "$D/default")" = local ] || { echo 'Microphone gate is managed only in local mode' >&2; exit 1; }
+case "${1:-status}" in
+ status) printf 'Muted: '; cat "$D/mic-muted"; exit 0;;
+ toggle) if [ "$(cat "$D/mic-muted" 2>/dev/null)" = 1 ]; then state=0; else state=1; fi;;
+ mute) state=1;; unmute) state=0;;
+ restore)
+  state=$(cat "$D/mic-muted" 2>/dev/null || echo 1)
+  if [ ! -r /sys/class/gpio/gpio414/value ]; then echo 414 > /sys/class/gpio/export 2>/dev/null || true; fi
+  physical=$(cat /sys/class/gpio/gpio414/value 2>/dev/null || echo unknown)
+  [ "$physical" = 1 ] || state=1;;
+ *) echo 'Usage: mini2-mic status|mute|unmute|toggle|restore' >&2; exit 2;;
+esac
+if [ "$state" = 1 ]; then
+ # Block new opens first, then stop holders of the old capture nodes.
+ for node in /dev/snd/pcmC0D0c /dev/snd/pcmC0D1c; do
+  [ -e "$node" ] || continue
+  if ! awk -v n="$node" '$2==n{found=1} END{exit !found}' /proc/mounts; then mount --bind /dev/null "$node"; fi
+ done
+ echo 1 > "$D/mic-muted"
+ for proc in /proc/[0-9]*; do
+  for fd in "$proc"/fd/*; do
+   target=$(readlink "$fd" 2>/dev/null || true)
+   case "$target" in /dev/snd/pcmC0D0c|/dev/snd/pcmC0D1c)
+    pid=${proc##*/}
+    kill -TERM "$pid" 2>/dev/null || true
+    sleep 0.1
+    kill -KILL "$pid" 2>/dev/null || true
+    break;;
+   esac
+  done
+ done
+else
+ for node in /dev/snd/pcmC0D0c /dev/snd/pcmC0D1c; do
+  if awk -v n="$node" '$4=="/null" && $5==n {found=1} END{exit !found}' /proc/self/mountinfo; then umount "$node"; fi
+ done
+ echo 0 > "$D/mic-muted"
+fi

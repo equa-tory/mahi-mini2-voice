@@ -1,0 +1,3 @@
+#!/bin/sh
+# Volume is dispatched once by mini2-controls.
+exit 0

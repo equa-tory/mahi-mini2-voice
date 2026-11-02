@@ -1,0 +1,75 @@
+name: mahi-mini2-voice
+x-whisper: &whisper
+  restart: unless-stopped
+  network_mode: host
+  volumes:
+    - ./models/whisper-cpp:/models:ro
+  read_only: true
+  tmpfs: [/tmp:size=32m]
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+services:
+  automation:
+    build: .
+    restart: unless-stopped
+    network_mode: host
+    env_file: .env
+    volumes:
+      - ./actions.yaml:/config/actions.yaml
+      - ./voice.yaml:/config/voice.yaml
+      - ./weather.yaml:/config/weather.yaml
+      - ./state:/state
+      - ./secrets:/secrets:ro
+    read_only: true
+    tmpfs: [/tmp:size=8m]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+  voice:
+    build:
+      context: .
+      dockerfile: Voice.Dockerfile
+    restart: unless-stopped
+    network_mode: host
+    env_file: .env
+    environment:
+      AUTOMATION_URL: http://127.0.0.1:8787
+      WHISPER_CPP_URL: http://127.0.0.1:8788/inference
+      WHISPER_CPP_AUDIO_CONTEXT: '512'
+      OMP_NUM_THREADS: '4'
+      HF_HUB_OFFLINE: '1'
+      HF_HUB_DISABLE_TELEMETRY: '1'
+      DO_NOT_TRACK: '1'
+    volumes:
+      - ./voice.yaml:/config/voice.yaml:ro
+      - ./secrets:/secrets:ro
+      - ./models:/models
+      - ./state:/state
+    read_only: true
+    tmpfs: [/tmp:size=32m]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 3g
+    cpus: 4
+  whisper-gpu:
+    <<: *whisper
+    profiles: [gpu]
+    platform: linux/amd64
+    image: mahi-whisper-cuda:sm61
+    build:
+      context: .
+      dockerfile: WhisperCuda.Dockerfile
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+  whisper-cpu:
+    <<: *whisper
+    profiles: [cpu]
+    build:
+      context: .
+      dockerfile: WhisperCpp.Dockerfile
+    mem_limit: 1g
+    cpus: 4

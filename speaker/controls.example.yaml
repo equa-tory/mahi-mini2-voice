@@ -1,0 +1,51 @@
+version: 1
+idle_rgb: [0, 0, 0]
+active_rgb: [0, 32, 32]
+bindings:
+  center.tap: playback
+  center.hold: pair
+  center.double_tap: face
+  center.triple_tap: timer.pick
+  plus.press: up
+  plus.repeat: up
+  minus.press: down
+  minus.repeat: down
+actions:
+  timer_2m: {type: timer, args: [start, 2m]}
+  timer_cancel: {type: timer, args: [cancel]}
+  weather_show: {type: weather, args: [show]}
+  weather_refresh: {type: weather, args: [refresh]}
+  playback: {type: playback.toggle}
+  pair: {type: bluetooth.pair}
+  up: {type: volume, args: [up]}
+  down: {type: volume, args: [down]}
+  face: {type: clock, args: [face, eyes, "5"]}
+  # Future integration; currently emits server_request then reports unavailable.
+  server_example: {type: server.request, args: [pc.music, play]}
+  demo:
+    type: sequence
+    steps:
+      - {type: clock, args: [text, HELO, "3"]}
+      - {type: ring, args: [animate, pulse, "2"]}
+      - {type: delay, args: ["2500"]}
+      - {type: clock, args: [face, eyes, "4"]}
+      - {type: ring, args: [animate, breathe, "4"]}
+      - {type: delay, args: ["4500"]}
+      - {type: ring, args: [animate, chase, "4"]}
+      - {type: clock, args: [text, "1234", "4"]}
+      - {type: delay, args: ["4500"]}
+      - {type: ring, args: [clear]}
+      - {type: clock, args: [clear]}
+  greeting:
+    type: sequence
+    steps:
+      - {type: clock, args: [text, HELO, "3"]}
+      - {type: ring, args: [set, "0", "16", "16", "3"]}
+faces:
+  # A top, B upper-right, C lower-right, D bottom,
+  # E lower-left, F upper-left, G middle.
+  eyes:
+    - segments: ["CDEG", "", "", "CDEG"]
+      ms: 1200
+    - segments: ["G", "", "", "G"]
+      ms: 150
