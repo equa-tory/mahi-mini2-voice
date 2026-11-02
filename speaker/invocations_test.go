@@ -44,3 +44,17 @@ func TestDisplayDefaultsAndCustomConfiguration(t *testing.T) {
 		t.Fatal("invalid duration accepted")
 	}
 }
+
+func TestServerPresentationsDoNotCreateLocalCancellation(t *testing.T) {
+	configMu.Lock()
+	before := runningActions
+	runningActions = map[string]string{"remote": "server_hello"}
+	configMu.Unlock()
+	defer func() { configMu.Lock(); runningActions = before; configMu.Unlock() }()
+	localCancel = nil
+	localPresentationUntil = time.Time{}
+	registerDisplay("clock", 3)
+	if localActionActive() {
+		t.Fatal("server_hello presentation became cancellable")
+	}
+}

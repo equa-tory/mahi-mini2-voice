@@ -30,9 +30,21 @@ func cancellableAction(name string, a Action) bool {
 	return a.Type == "sequence" || a.Type == "bluetooth.pair" || (a.Type == "weather" && len(a.Args) > 0 && a.Args[0] == "show") || (a.Type == "clock" && len(a.Args) > 0 && (a.Args[0] == "face" || a.Args[0] == "text" || a.Args[0] == "draw" || a.Args[0] == "segments"))
 }
 func registerDisplay(name string, seconds int) {
+	configMu.RLock()
+	protected := false
+	for _, running := range runningActions {
+		if strings.HasPrefix(running, "server_") {
+			protected = true
+		}
+	}
+	configMu.RUnlock()
 	localInvocationMu.Lock()
 	defer localInvocationMu.Unlock()
 	if localCancel != nil {
+		return
+	}
+	if protected {
+		localPresentationUntil = time.Time{}
 		return
 	}
 	localInvocationID = invocationID.Add(1)
